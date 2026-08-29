@@ -24,9 +24,7 @@
     </header>
 
     <!-- Top State Bar: Welcome Back OR Quick-Login Prompt -->
-    <div id="user-state-bar" class="user-state-bar">
-        <!-- Dynamic content injected by app.js -->
-    </div>
+    <div id="user-state-bar" class="user-state-bar"></div>
 
     <!-- Delivery Day Ticker -->
     <div class="delivery-ticker">
@@ -35,17 +33,13 @@
 
     <!-- Interactive Hero Banner Slider Area -->
     <section class="banner-section">
-        <div id="banner-carousel" class="banner-carousel">
-            <!-- Dynamic Banner Cards Load Here -->
-        </div>
+        <div id="banner-carousel" class="banner-carousel"></div>
         <div id="slider-dots" class="slider-dots"></div>
     </section>
 
     <!-- Primary Category Circle Shortcuts -->
     <div class="circle-shortcuts-wrapper">
-        <div class="circle-shortcuts-container" id="category-circles">
-            <!-- Dynamic Category Circles Render Here -->
-        </div>
+        <div class="circle-shortcuts-container" id="category-circles"></div>
     </div>
 
     <!-- Search Bar & Sidebar Filter Toggle Bar -->
@@ -67,12 +61,10 @@
         <div id="product-list" class="product-grid">Loading products...</div>
     </main>
 
-    <!-- Past Purchases Slider (Hints for Fast Reorder) -->
+    <!-- Past Purchases Slider -->
     <section id="past-purchases-section" class="past-purchases-section" style="display: none;">
         <h3 class="section-title">⚡ Reorder From Past Purchases</h3>
-        <div id="past-purchases-slider" class="past-purchases-slider">
-            <!-- Past Purchased Items Load Here -->
-        </div>
+        <div id="past-purchases-slider" class="past-purchases-slider"></div>
     </section>
 
     <!-- Sticky Bottom Cart Sheet -->
@@ -130,7 +122,7 @@
         </form>
     </section>
 
-    <!-- Sidebar Filter Drawer & Overlay -->
+    <!-- Sidebar Filter Drawer -->
     <div id="filter-sidebar-overlay" class="sidebar-overlay" onclick="toggleSidebar()"></div>
     <aside id="filter-sidebar" class="filter-sidebar">
         <div class="sidebar-header">
@@ -162,7 +154,7 @@
         </div>
     </aside>
 
-    <!-- Account Details Drawer & Overlay -->
+    <!-- Account Details Drawer -->
     <div id="account-drawer-overlay" class="sidebar-overlay" onclick="toggleAccountDrawer()"></div>
     <aside id="account-drawer" class="filter-sidebar">
         <div class="sidebar-header">
@@ -170,15 +162,9 @@
             <button type="button" class="btn-close-sidebar" onclick="toggleAccountDrawer()">✕</button>
         </div>
         <div class="sidebar-content">
-            <div id="account-profile-info" class="account-profile-box">
-                <!-- Data injected dynamically -->
-            </div>
-
+            <div id="account-profile-info" class="account-profile-box"></div>
             <h4 style="margin: 16px 0 8px;">Order History</h4>
-            <div id="account-order-history" class="order-history-list">
-                <!-- Orders injected dynamically -->
-            </div>
-
+            <div id="account-order-history" class="order-history-list"></div>
             <button type="button" id="drawer-signout-btn" class="btn-danger" onclick="signOut()" style="display:none; margin-top: 20px;">
                 Sign Out
             </button>
