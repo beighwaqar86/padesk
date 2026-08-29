@@ -573,13 +573,37 @@ function renderProducts(products) {
 }
 
 // 12. QUANTITY BASKET & COMBO ENGINE
-function addToCart(product) {
+// 12. QUANTITY BASKET & COMBO ENGINE (WITH BUTTON ANIMATION)
+function addToCart(product, event) {
     if (cart[product.id]) {
         cart[product.id].qty += 1;
     } else {
         cart[product.id] = { product: product, qty: 1 };
     }
     updateCartUI();
+
+    // Visual Feedback Animation on the clicked button (if event is passed)
+    if (event && event.target) {
+        const btn = event.target;
+        const originalText = btn.innerText;
+        
+        btn.innerText = "Added ✓";
+        btn.classList.add("success");
+        btn.disabled = true;
+
+        setTimeout(() => {
+            btn.innerText = originalText;
+            btn.classList.remove("success");
+            btn.disabled = false;
+        }, 800); // Reset after 0.8 seconds
+    }
+
+    // Subtle pulse effect on the bottom cart sheet to draw the eye
+    const cartCard = document.getElementById("cart-section");
+    if (cartCard) {
+        cartCard.classList.add("pulse");
+        setTimeout(() => cartCard.classList.remove("pulse"), 300);
+    }
 }
 
 function updateQuantity(productId, change) {
