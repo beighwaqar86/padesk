@@ -85,15 +85,49 @@
             <div id="price-rule" class="rule-badge">❌ Total: K 0.00 / K 249.00 min</div>
         </div>
 
-        <form id="checkout-form" onsubmit="handleCheckout(event)">
-            <label for="customer-phone">WhatsApp Contact Number:</label>
-            <input 
-                type="tel" 
-                id="customer-phone" 
-                placeholder="e.g. 0977123456" 
-                oninput="checkReturningCustomer(this.value)" 
-                required
-            >
+       <form id="checkout-form" onsubmit="handleCheckout(event)">
+            
+            <div style="margin-bottom: 16px;">
+                <label for="workplace-select" style="display:block; font-weight:700; font-size:0.8rem; margin-bottom:6px; color:#4a5568;">📍 Delivery Point</label>
+                <select id="workplace-select" required class="form-input">
+                    <option value="">-- Choose your office --</option>
+                    <option value="New Government Complex">New Government Complex (Independence Ave)</option>
+                    <option value="Ministry of Finance">Ministry of Finance (Haile Selassie Ave)</option>
+                    <option value="Zanaco HQ">Zanaco HQ (Cairo Road)</option>
+                </select>
+            </div>
+
+            <div style="margin-bottom: 16px;">
+                <label for="customer-phone" style="display:block; font-weight:700; font-size:0.8rem; margin-bottom:6px; color:#4a5568;">📱 WhatsApp Number</label>
+                <input 
+                    type="tel" 
+                    id="customer-phone" 
+                    placeholder="e.g. 0977123456" 
+                    oninput="checkReturningCustomer(this.value)" 
+                    required 
+                    class="form-input"
+                >
+            </div>
+
+            <div style="background: white; border: 1px solid #e2e8f0; padding: 16px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+                <label style="display:block; font-weight:800; font-size:0.85rem; margin-bottom:12px; color:#1a202c;">👤 CUSTOMER PROFILE</label>
+                
+                <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                    <select id="customer-title" required class="form-input" style="width: 35%; padding: 10px;">
+                        <option value="">Title</option>
+                        <option value="Mr.">Mr.</option>
+                        <option value="Mrs.">Mrs.</option>
+                        <option value="Ms.">Ms.</option>
+                        <option value="Dr.">Dr.</option>
+                    </select>
+                    <input type="text" id="customer-first-name" placeholder="First Name" required class="form-input" style="flex: 1; padding: 10px;">
+                </div>
+                
+                <input type="text" id="customer-last-name" placeholder="Last Name" required class="form-input" style="width: 100%; padding: 10px;">
+            </div>
+
+            <button type="submit" id="checkout-btn" class="btn-primary" disabled>Build Min Combo (3 Items & K249) to Order</button>
+        </form>
 
             <!-- Replace the old Full Name input with this: -->
             <label>Customer Name:</label>
