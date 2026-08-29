@@ -15,20 +15,20 @@ window.onload = function() {
     autoPopulateSavedCustomer();
 };
 
-// 1. AUTO-POPULATE & STATE BAR ENGINE
+// 1. AUTO-POPULATE & STATE BAR ENGINE (FIXED LOGIN VERIFICATION)
 function autoPopulateSavedCustomer() {
     const savedPhone = localStorage.getItem("padesk_phone");
-    const savedTitle = localStorage.getItem("padesk_title");
-    const savedFirstName = localStorage.getItem("padesk_first_name");
-    const savedLastName = localStorage.getItem("padesk_last_name");
-    const savedOffice = localStorage.getItem("padesk_office");
+    const savedTitle = localStorage.getItem("padesk_title") || "";
+    const savedFirstName = localStorage.getItem("padesk_first_name") || "";
+    const savedLastName = localStorage.getItem("padesk_last_name") || "";
+    const savedOffice = localStorage.getItem("padesk_office") || "";
 
     const stateBar = document.getElementById("user-state-bar");
     
-    // Create a friendly display name (e.g., "Mr. Phiri" or "Mutale")
-    const displayName = savedTitle && savedLastName ? `${savedTitle} ${savedLastName}` : savedFirstName;
+    const displayName = savedTitle && savedLastName ? `${savedTitle} ${savedLastName}` : (savedFirstName || "Shopper");
 
-    if (savedPhone && savedFirstName) {
+    // Fix: Only strictly require the phone number to confirm login state
+    if (savedPhone) {
         if (stateBar) {
             stateBar.style.display = "flex";
             stateBar.innerHTML = `
@@ -38,9 +38,9 @@ function autoPopulateSavedCustomer() {
         }
 
         if (document.getElementById("customer-phone")) document.getElementById("customer-phone").value = savedPhone;
-        if (document.getElementById("customer-title")) document.getElementById("customer-title").value = savedTitle || "";
+        if (document.getElementById("customer-title")) document.getElementById("customer-title").value = savedTitle;
         if (document.getElementById("customer-first-name")) document.getElementById("customer-first-name").value = savedFirstName;
-        if (document.getElementById("customer-last-name")) document.getElementById("customer-last-name").value = savedLastName || "";
+        if (document.getElementById("customer-last-name")) document.getElementById("customer-last-name").value = savedLastName;
         if (document.getElementById("workplace-select") && savedOffice) document.getElementById("workplace-select").value = savedOffice;
 
         loadPastPurchases(savedPhone);
@@ -59,34 +59,61 @@ function autoPopulateSavedCustomer() {
     }
 }
 
-// 2. SIGN-OUT FIX
-function signOut() {
-    localStorage.removeItem("padesk_phone");
-    localStorage.removeItem("padesk_title");
-    localStorage.removeItem("padesk_first_name");
-    localStorage.removeItem("padesk_last_name");
-    localStorage.removeItem("padesk_office");
+// 2. QUICK LOGIN TRIGGER
+async function triggerQuickLogin() {
+    const input = document.getElementById("quick-phone");
+    const btn = document.getElementById("btn-quick-login");
     
-    // Clear legacy cache if it exists
-    localStorage.removeItem("padesk_name"); 
+    if (input && input.value) {
+        if (btn) btn.innerText = "⏳";
+        await checkReturningCustomer(input.value, true);
+        if (btn && btn.innerText === "⏳") btn.innerText = "Go";
+    }
+}
 
-    if (document.getElementById("customer-phone")) document.getElementById("customer-phone").value = "";
-    if (document.getElementById("customer-title")) document.getElementById("customer-title").value = "";
-    if (document.getElementById("customer-first-name")) document.getElementById("customer-first-name").value = "";
-    if (document.getElementById("customer-last-name")) document.getElementById("customer-last-name").value = "";
-    if (document.getElementById("workplace-select")) document.getElementById("workplace-select").value = "";
-
-    const pastSection = document.getElementById("past-purchases-section");
-    if (pastSection) pastSection.style.display = "none";
-
-    resetAccountDrawerUI();
-
-    const accountDrawer = document.getElementById("account-drawer");
-    if (accountDrawer && accountDrawer.classList.contains("open")) {
-        toggleAccountDrawer();
+// 3. DYNAMIC CUSTOMER LOOKUP (HANDLES LEGACY MISSING NAMES)
+async function checkReturningCustomer(phone, isQuickLogin = false) {
+    const cleanPhone = phone.trim();
+    if (cleanPhone.length < 9) {
+        if (isQuickLogin) alert("Please enter a valid phone number.");
+        return;
     }
 
-    autoPopulateSavedCustomer();
+    try {
+        const { data: customer, error } = await db
+            .from('customers')
+            .select('*')
+            .eq('phone_number', cleanPhone)
+            .single();
+
+        if (customer) {
+            if (document.getElementById("customer-title")) document.getElementById("customer-title").value = customer.title || "";
+            if (document.getElementById("customer-first-name")) document.getElementById("customer-first-name").value = customer.first_name || "";
+            if (document.getElementById("customer-last-name")) document.getElementById("customer-last-name").value = customer.last_name || "";
+            if (document.getElementById("workplace-select")) document.getElementById("workplace-select").value = customer.default_office || "";
+            if (document.getElementById("customer-phone")) document.getElementById("customer-phone").value = customer.phone_number;
+
+            localStorage.setItem("padesk_phone", customer.phone_number);
+            localStorage.setItem("padesk_title", customer.title || "");
+            localStorage.setItem("padesk_first_name", customer.first_name || "");
+            localStorage.setItem("padesk_last_name", customer.last_name || "");
+            localStorage.setItem("padesk_office", customer.default_office || "");
+
+            autoPopulateSavedCustomer();
+            
+            if (isQuickLogin) {
+                const displayName = customer.title && customer.last_name ? `${customer.title} ${customer.last_name}` : (customer.first_name || "Shopper");
+                alert(`Welcome back, ${displayName}!`);
+            }
+        } else {
+            if (isQuickLogin) {
+                alert("No account found for this number. Simply build your combo below to get started!");
+            }
+        }
+    } catch (err) {
+        console.error("Lookup error:", err);
+        if (isQuickLogin) alert("Error connecting to database. Please try again.");
+    }
 }
 
 // 3. DYNAMIC CUSTOMER LOOKUP
