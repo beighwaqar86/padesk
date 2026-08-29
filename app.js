@@ -5,6 +5,8 @@ const SUPABASE_ANON_KEY = "sb_publishable_j_MkiOlGUZOBsR8TSxIM1w_pnQ_B1xx";
 let db;
 let allProducts = [];
 let cart = {};
+let currentSlide = 0;
+let slideInterval;
 
 window.onload = function() {
     db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -23,15 +25,16 @@ function toggleSidebar() {
     }
 }
 
-// 2. FETCH MARQUEE BANNERS (DUPLICATED FOR CONTINUOUS LOOP)
+// 2. INTERACTIVE HERO SLIDER LOGIC WITH AUTO-ADVANCE & DOT SYNC
 async function loadBanners() {
     const { data: banners } = await db.from('banners').select('*').eq('is_active', true);
     if (!banners || banners.length === 0) return;
 
     const container = document.getElementById("banner-carousel");
+    const dotsContainer = document.getElementById("slider-dots");
+
     if (container) {
-        const marqueeList = [...banners, ...banners];
-        container.innerHTML = marqueeList.map(b => `
+        container.innerHTML = banners.map(b => `
             <div class="banner-card" style="background-image: url('${b.image_url}');">
                 <div class="banner-overlay">
                     <h4>${b.title || ''}</h4>
@@ -39,6 +42,40 @@ async function loadBanners() {
                 </div>
             </div>
         `).join('');
+
+        if (dotsContainer) {
+            dotsContainer.innerHTML = banners.map((_, idx) => `
+                <span class="dot ${idx === 0 ? 'active' : ''}" id="dot-${idx}"></span>
+            `).join('');
+        }
+
+        startAutoSlide(banners.length);
+        container.addEventListener('scroll', () => syncDotsOnScroll(banners.length));
+    }
+}
+
+function startAutoSlide(totalSlides) {
+    clearInterval(slideInterval);
+    slideInterval = setInterval(() => {
+        const container = document.getElementById("banner-carousel");
+        if (!container) return;
+
+        currentSlide = (currentSlide + 1) % totalSlides;
+        const slideWidth = container.querySelector('.banner-card')?.offsetWidth || 280;
+        container.scrollTo({ left: (slideWidth + 12) * currentSlide, behavior: 'smooth' });
+    }, 4000);
+}
+
+function syncDotsOnScroll(totalSlides) {
+    const container = document.getElementById("banner-carousel");
+    if (!container) return;
+
+    const slideWidth = container.querySelector('.banner-card')?.offsetWidth || 280;
+    const activeIdx = Math.round(container.scrollLeft / (slideWidth + 12));
+
+    for (let i = 0; i < totalSlides; i++) {
+        const dot = document.getElementById(`dot-${i}`);
+        if (dot) dot.classList.toggle('active', i === activeIdx);
     }
 }
 
