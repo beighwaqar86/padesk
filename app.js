@@ -331,25 +331,138 @@ async function loadProducts() {
 }
 
 // 10. BUILD FILTERS & CIRCLE SHORTCUTS USING LOWERCASE 'category'
+// DYNAMICALLY BUILD BUSINESS MASTER SHORTCUTS
 function buildDynamicMasterFilters() {
+    // 1. Populate Dropdown Filters (Sidebar)
     const categories = ['ALL', ...new Set(allProducts.map(p => p.category).filter(Boolean))];
     const categorySelect = document.getElementById("filter-category");
     if (categorySelect) {
         categorySelect.innerHTML = categories.map(c => `<option value="${c}">${c}</option>`).join('');
     }
 
-    const categoryCircles = document.getElementById("category-circles");
-    if (categoryCircles) {
-        const icons = { 'ALL': '🔥', 'Daily Needs': '🛒', 'Beauty': '✨', 'Electronics': '⚡', 'Deals': '🏷️' };
-        categoryCircles.innerHTML = categories.map((cat, idx) => `
-            <div class="circle-item ${idx === 0 ? 'active' : ''}" onclick="selectCircleCategory('${cat}', this)">
-                <div class="circle-icon">${icons[cat] || '📦'}</div>
-                <span>${cat}</span>
+    // 2. Build Business Level Circles (First Level)
+    const businesses = ['ALL', ...new Set(allProducts.map(p => p.business).filter(Boolean))];
+    const businessCircles = document.getElementById("business-circles");
+    
+    if (businessCircles) {
+        const icons = { 'ALL': '🔥', 'Groceries': '🛒', 'Retail': '🛍️', 'Electronics': '⚡', 'Beauty': '✨' };
+        businessCircles.innerHTML = businesses.map((bus, idx) => `
+            <div class="circle-item ${idx === 0 ? 'active' : ''}" onclick="selectBusinessCircle('${bus}', this)">
+                <div class="circle-icon">${icons[bus] || '🏢'}</div>
+                <span>${bus === 'ALL' ? 'All Businesses' : bus}</span>
             </div>
         `).join('');
     }
 
-    handleCategoryChange();
+    applyFilters();
+}
+
+// FIRST LEVEL: SELECT BUSINESS
+function selectBusinessCircle(businessName, element) {
+    document.querySelectorAll('#business-circles .circle-item').forEach(el => el.classList.remove('active'));
+    if (element) element.classList.add('active');
+
+    // Hide subcategory row initially
+    document.getElementById("subcategory-circles").style.display = 'none';
+
+    const catCirclesContainer = document.getElementById("category-circles");
+
+    if (businessName === 'ALL') {
+        catCirclesContainer.style.display = 'none';
+    } else {
+        // Filter products belonging to this business to find available categories
+        const busProducts = allProducts.filter(p => p.business === businessName);
+        const categories = ['ALL', ...new Set(busProducts.map(p => p.category).filter(Boolean))];
+
+        if (categories.length > 1) {
+            catCirclesContainer.style.display = 'flex';
+            catCirclesContainer.innerHTML = categories.map((cat, idx) => `
+                <div class="circle-item ${idx === 0 ? 'active' : ''}" onclick="selectCategoryCircle('${businessName}', '${cat}', this)">
+                    <div class="circle-icon" style="width:48px; height:48px; font-size:1.1rem;">📂</div>
+                    <span style="font-size:0.68rem;">${cat === 'ALL' ? 'All Categories' : cat}</span>
+                </div>
+            `).join('');
+        } else {
+            catCirclesContainer.style.display = 'none';
+        }
+    }
+
+    applyFilters();
+}
+
+// SECOND LEVEL: DRILL DOWN TO CATEGORY
+function selectCategoryCircle(businessName, categoryName, element) {
+    document.querySelectorAll('#category-circles .circle-item').forEach(el => el.classList.remove('active'));
+    if (element) element.classList.add('active');
+
+    const subCirclesContainer = document.getElementById("subcategory-circles");
+
+    if (categoryName === 'ALL') {
+        subCirclesContainer.style.display = 'none';
+    } else {
+        const catProducts = allProducts.filter(p => p.business === businessName && p.category === categoryName);
+        const subcategories = ['ALL', ...new Set(catProducts.map(p => p.sub_category).filter(Boolean))];
+
+        if (subcategories.length > 1) {
+            subCirclesContainer.style.display = 'flex';
+            subCirclesContainer.innerHTML = subcategories.map((sub, idx) => `
+                <div class="circle-item ${idx === 0 ? 'active' : ''}" onclick="selectSubcategoryCircle('${sub}', this)">
+                    <div class="circle-icon" style="width:42px; height:42px; font-size:1rem;">📌</div>
+                    <span style="font-size:0.65rem;">${sub === 'ALL' ? 'All Sub-Categories' : sub}</span>
+                </div>
+            `).join('');
+        } else {
+            subCirclesContainer.style.display = 'none';
+        }
+    }
+
+    applyFilters();
+}
+
+// THIRD LEVEL: DRILL DOWN TO SUB-CATEGORY
+function selectSubcategoryCircle(subName, element) {
+    document.querySelectorAll('#subcategory-circles .circle-item').forEach(el => el.classList.remove('active'));
+    if (element) element.classList.add('active');
+
+    applyFilters();
+}
+
+// MODIFIED FILTER ENGINE INCORPORATING HIERARCHICAL SHORTCUTS
+function applyFilters() {
+    const activeBusinessEl = document.querySelector('#business-circles .circle-item.active span');
+    const activeCategoryEl = document.querySelector('#category-circles .circle-item.active span');
+    const activeSubcategoryEl = document.querySelector('#subcategory-circles .circle-item.active span');
+
+    const selectedBusiness = activeBusinessEl ? activeBusinessEl.innerText : 'All Businesses';
+    const selectedCategory = activeCategoryEl ? activeCategoryEl.innerText : 'All Categories';
+    const selectedSubcategory = activeSubcategoryEl ? activeSubcategoryEl.innerText : 'All Sub-Categories';
+
+    const searchQuery = (document.getElementById("search-input")?.value || "").toLowerCase().trim();
+
+    let filtered = allProducts;
+
+    if (selectedBusiness !== 'All Businesses' && selectedBusiness !== 'ALL') {
+        filtered = filtered.filter(p => p.business === selectedBusiness);
+    }
+    if (selectedCategory !== 'All Categories' && selectedCategory !== 'ALL') {
+        filtered = filtered.filter(p => p.category === selectedCategory);
+    }
+    if (selectedSubcategory !== 'All Sub-Categories' && selectedSubcategory !== 'ALL') {
+        filtered = filtered.filter(p => p.sub_category === selectedSubcategory);
+    }
+
+    if (searchQuery !== "") {
+        filtered = filtered.filter(p => 
+            (p.name && p.name.toLowerCase().includes(searchQuery)) ||
+            (p.product_code && p.product_code.toLowerCase().includes(searchQuery)) ||
+            (p.category && p.category.toLowerCase().includes(searchQuery)) ||
+            (p.sub_category && p.sub_category.toLowerCase().includes(searchQuery)) ||
+            (p.brand && p.brand.toLowerCase().includes(searchQuery)) ||
+            (p.business && p.business.toLowerCase().includes(searchQuery))
+        );
+    }
+
+    renderProducts(filtered);
 }
 
 function handleCategoryChange() {
