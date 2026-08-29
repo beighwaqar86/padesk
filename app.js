@@ -191,7 +191,7 @@ async function loadPastPurchases(phone) {
                     <h5>${p.name}</h5>
                     <div class="price" style="font-size:0.8rem; margin:2px 0;">K ${parseFloat(p.deal_price || p.price).toFixed(2)}</div>
                 </div>
-                <button onclick='addToCart(${JSON.stringify(p)})' class="btn-add" style="padding:4px 8px; font-size:0.75rem;">+ Reorder</button>
+                <button onclick='addToCart(${JSON.stringify(p)}, event)' class="btn-add" style="padding:4px 8px; font-size:0.75rem;">+ Reorder</button>
             </div>
         `).join('');
     }
