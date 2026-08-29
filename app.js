@@ -1,6 +1,6 @@
 // YOUR LIVE SUPABASE KEYS
 const SUPABASE_URL = "https://cziefuaclocpwicwjprb.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_j_MkIO..."; // Paste your full publishable key from your screenshot
+const SUPABASE_ANON_KEY = "sb_publishable_j_MkiOlGUZOBsR8TSxIM1w_pnQ_B1xx";
 
 // Initialize Supabase Client
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
