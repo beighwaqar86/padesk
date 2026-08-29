@@ -14,7 +14,7 @@ body {
     padding-bottom: 30px;
 }
 
-/* Header & Welcome Bar */
+/* Header & User State Bar */
 .app-header {
     background: white;
     padding: 12px 16px;
@@ -41,15 +41,30 @@ body {
     cursor: pointer;
 }
 
-.welcome-bar {
+/* Dynamic State Bar (Welcome Bar or Quick Login) */
+.user-state-bar {
     background: #e6f7f0;
     color: var(--primary-dark);
     padding: 8px 16px;
-    font-size: 0.85rem;
+    font-size: 0.82rem;
     display: flex;
     justify-content: space-between;
     align-items: center;
     border-bottom: 1px solid #b2f5ea;
+}
+
+.quick-login-input-wrap {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
+.quick-login-input-wrap input {
+    padding: 4px 8px;
+    font-size: 0.8rem;
+    border: 1px solid #0baf65;
+    border-radius: 4px;
+    width: 120px;
 }
 
 .btn-link-signout {
