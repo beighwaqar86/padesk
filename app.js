@@ -15,7 +15,7 @@ window.onload = function() {
     autoPopulateSavedCustomer();
 };
 
-// 1. AUTO-POPULATE & STATE BAR ENGINE (WELCOME VS QUICK-LOGIN)
+// 1. AUTO-POPULATE & STATE BAR ENGINE (WITH EXPLICIT LOGIN BUTTON)
 function autoPopulateSavedCustomer() {
     const savedPhone = localStorage.getItem("padesk_phone");
     const savedName = localStorage.getItem("padesk_name");
@@ -43,19 +43,27 @@ function autoPopulateSavedCustomer() {
 
         loadPastPurchases(savedPhone);
     } else {
-        // Guest User: Render Optional Quick-Login Bar
+        // Guest User: Render Quick-Login Bar with Explicit Button
         if (stateBar) {
             stateBar.style.display = "flex";
             stateBar.innerHTML = `
-                <span>Already ordered before?</span>
+                <span>Already ordered?</span>
                 <div class="quick-login-input-wrap">
-                    <input type="tel" id="quick-phone" placeholder="Enter Phone" oninput="checkReturningCustomer(this.value)">
+                    <input type="tel" id="quick-phone" placeholder="Enter Phone" onkeypress="if(event.key==='Enter') triggerQuickLogin()">
+                    <button type="button" onclick="triggerQuickLogin()" style="background:#0baf65; color:white; border:none; border-radius:4px; padding:4px 10px; font-weight:bold; cursor:pointer;">Go</button>
                 </div>
             `;
         }
         
-        // Reset Drawer UI if open
         resetAccountDrawerUI();
+    }
+}
+
+// Quick Login Trigger Helper
+function triggerQuickLogin() {
+    const input = document.getElementById("quick-phone");
+    if (input && input.value) {
+        checkReturningCustomer(input.value);
     }
 }
 
