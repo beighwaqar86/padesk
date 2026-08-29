@@ -583,47 +583,73 @@ function updateCartUI() {
 // 12. CHECKOUT WITH IMPLICIT CUSTOMER PROFILE UPSERT
 async function handleCheckout(event) {
     event.preventDefault();
-    const items = Object.values(cart);
-    const totalCount = items.reduce((sum, item) => sum + item.qty, 0);
-    const totalPrice = items.reduce((sum, item) => {
-        const p = item.product.deal_price ? item.product.deal_price : item.product.price;
-        return sum + (parseFloat(p) * item.qty);
-    }, 0);
+    
+    try {
+        const btn = document.getElementById("checkout-btn");
+        btn.innerText = "⏳ Processing Order...";
+        btn.disabled = true;
 
-    if (totalCount < 3 || totalPrice < 249.00) return alert("Combo criteria not met!");
+        const items = Object.values(cart);
+        const totalCount = items.reduce((sum, item) => sum + item.qty, 0);
+        const totalPrice = items.reduce((sum, item) => {
+            const p = item.product.deal_price ? item.product.deal_price : item.product.price;
+            return sum + (parseFloat(p) * item.qty);
+        }, 0);
 
-    const contactPhone = document.getElementById("customer-phone").value.trim();
-    const customerName = document.getElementById("customer-name").value.trim();
-    const selectedOffice = document.getElementById("workplace-select").value;
+        if (totalCount < 3 || totalPrice < 249.00) {
+            updateCartUI(); // Reset button
+            return alert("Combo criteria not met!");
+        }
 
-    const { error: custError } = await db.from('customers').upsert([{
-        phone_number: contactPhone,
-        full_name: customerName,
-        default_office: selectedOffice,
-        last_order_at: new Date().toISOString()
-    }], { onConflict: 'phone_number' });
+        const contactPhone = document.getElementById("customer-phone").value.trim();
+        const cTitle = document.getElementById("customer-title").value;
+        const cFirstName = document.getElementById("customer-first-name").value.trim();
+        const cLastName = document.getElementById("customer-last-name").value.trim();
+        const selectedOffice = document.getElementById("workplace-select").value;
 
-    if (custError) {
-        console.error("Customer record creation error:", custError.message);
-    }
+        // 1. Update Customer Master
+        const { error: custError } = await db.from('customers').upsert([{
+            phone_number: contactPhone,
+            title: cTitle,
+            first_name: cFirstName,
+            last_name: cLastName,
+            default_office: selectedOffice,
+            last_order_at: new Date().toISOString()
+        }], { onConflict: 'phone_number' });
 
-    const { error: orderError } = await db.from('orders').insert([{
-        customer_phone: contactPhone,
-        delivery_location: selectedOffice,
-        total_amount: totalPrice,
-        order_items_json: items,
-        status: 'Pending Aggregation'
-    }]);
+        if (custError) {
+            throw new Error("Supabase Customers Table Error: " + custError.message + "\n\nDid you run the ALTER TABLE SQL script?");
+        }
 
-    if (orderError) {
-        alert("Error submitting order: " + orderError.message);
-    } else {
+        // 2. Save Order
+        const { error: orderError } = await db.from('orders').insert([{
+            customer_phone: contactPhone,
+            delivery_location: selectedOffice,
+            total_amount: totalPrice,
+            order_items_json: items,
+            status: 'Pending Aggregation'
+        }]);
+
+        if (orderError) {
+            throw new Error("Supabase Orders Table Error: " + orderError.message);
+        }
+
+        // 3. Success! Save to cache
         localStorage.setItem("padesk_phone", contactPhone);
-        localStorage.setItem("padesk_name", customerName);
+        localStorage.setItem("padesk_title", cTitle);
+        localStorage.setItem("padesk_first_name", cFirstName);
+        localStorage.setItem("padesk_last_name", cLastName);
         localStorage.setItem("padesk_office", selectedOffice);
 
         cart = {};
         updateCartUI();
         autoPopulateSavedCustomer();
+        
+        alert(`Zikomo ${cTitle} ${cLastName || cFirstName}! Your combo order has been submitted successfully.`);
+
+    } catch (error) {
+        console.error(error);
+        alert("Action Failed:\n" + error.message);
+        updateCartUI(); // Reset button state on failure
     }
 }
