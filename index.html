@@ -37,22 +37,12 @@
         <div id="slider-dots" class="slider-dots"></div>
     </section>
 
-    <!-- Primary Circular Shortcuts (Business & Drill-down Categories) -->
-<div class="circle-shortcuts-wrapper">
-    <div class="circle-shortcuts-container" id="business-circles">
-        <!-- Dynamic Business Circles Render Here -->
+    <!-- Hierarchical Circular Shortcuts (Business -> Category -> Subcategory) -->
+    <div class="circle-shortcuts-wrapper">
+        <div class="circle-shortcuts-container" id="business-circles"></div>
+        <div class="circle-shortcuts-container sub-circles" id="category-circles" style="display: none;"></div>
+        <div class="circle-shortcuts-container sub-circles" id="subcategory-circles" style="display: none;"></div>
     </div>
-    
-    <!-- Drill-Down Category Shortcuts -->
-    <div class="circle-shortcuts-container sub-circles" id="category-circles" style="display: none;">
-        <!-- Dynamic Category Circles Render Here -->
-    </div>
-
-    <!-- Drill-Down Sub-Category Shortcuts -->
-    <div class="circle-shortcuts-container sub-circles" id="subcategory-circles" style="display: none;">
-        <!-- Dynamic Sub-Category Circles Render Here -->
-    </div>
-</div>
 
     <!-- Search Bar & Sidebar Filter Toggle Bar -->
     <div class="search-filter-bar">
@@ -134,6 +124,31 @@
         </form>
     </section>
 
+    <!-- Order Preview / Confirmation Modal -->
+    <div id="order-preview-overlay" class="sidebar-overlay" onclick="closeOrderPreview()"></div>
+    <div id="order-preview-modal" class="order-preview-modal" style="display: none;">
+        <div class="sidebar-header">
+            <h3>📋 Review Your Order</h3>
+            <button type="button" class="btn-close-sidebar" onclick="closeOrderPreview()">✕</button>
+        </div>
+        <div class="sidebar-content">
+            <div class="account-profile-box" id="preview-customer-details"></div>
+
+            <h4 style="margin: 12px 0 6px; font-size: 0.9rem;">Items Summary</h4>
+            <div id="preview-items-list" style="max-height: 180px; overflow-y: auto; margin-bottom: 12px; border-bottom: 1px solid #edf2f7; padding-bottom: 8px;"></div>
+
+            <div style="display: flex; justify-content: space-between; font-weight: 800; font-size: 1rem; margin-bottom: 16px;">
+                <span>Total Amount:</span>
+                <span id="preview-total-amount" style="color: #0baf65;">K 0.00</span>
+            </div>
+
+            <div style="display: flex; gap: 10px;">
+                <button type="button" onclick="closeOrderPreview()" style="flex: 1; background: #edf2f7; border: 1px solid #cbd5e0; padding: 12px; border-radius: 8px; font-weight: bold; cursor: pointer;">Edit Order</button>
+                <button type="button" onclick="executeFinalOrderSubmission()" class="btn-primary" style="flex: 1; padding: 12px;">Confirm & Submit</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Sidebar Filter Drawer -->
     <div id="filter-sidebar-overlay" class="sidebar-overlay" onclick="toggleSidebar()"></div>
     <aside id="filter-sidebar" class="filter-sidebar">
@@ -143,14 +158,8 @@
         </div>
         <div class="sidebar-content">
             <div class="filter-group">
-                <label>Business</label>
-                <select id="filter-business" onchange="handleBusinessSidebarChange()" class="form-input">
-                    <option value="ALL">All Businesses</option>
-                </select>
-            </div>
-            <div class="filter-group">
                 <label>Category</label>
-                <select id="filter-category" onchange="handleCategorySidebarChange()" class="form-input">
+                <select id="filter-category" onchange="handleCategoryChange()" class="form-input">
                     <option value="ALL">All Categories</option>
                 </select>
             </div>
@@ -171,6 +180,7 @@
             </button>
         </div>
     </aside>
+
     <!-- Account Details Drawer -->
     <div id="account-drawer-overlay" class="sidebar-overlay" onclick="toggleAccountDrawer()"></div>
     <aside id="account-drawer" class="filter-sidebar">
