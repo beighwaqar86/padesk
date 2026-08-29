@@ -18,32 +18,33 @@ window.onload = function() {
 // 1. AUTO-POPULATE & STATE BAR ENGINE
 function autoPopulateSavedCustomer() {
     const savedPhone = localStorage.getItem("padesk_phone");
-    const savedName = localStorage.getItem("padesk_name");
+    const savedTitle = localStorage.getItem("padesk_title");
+    const savedFirstName = localStorage.getItem("padesk_first_name");
+    const savedLastName = localStorage.getItem("padesk_last_name");
     const savedOffice = localStorage.getItem("padesk_office");
 
     const stateBar = document.getElementById("user-state-bar");
+    
+    // Create a friendly display name (e.g., "Mr. Phiri" or "Mutale")
+    const displayName = savedTitle && savedLastName ? `${savedTitle} ${savedLastName}` : savedFirstName;
 
-    if (savedPhone && savedName) {
-        // Known User: Render Welcome Back Bar
+    if (savedPhone && savedFirstName) {
         if (stateBar) {
             stateBar.style.display = "flex";
             stateBar.innerHTML = `
-                <span>Welcome back, <strong>${savedName}</strong>! 👋</span>
+                <span>Welcome back, <strong>${displayName}</strong>! 👋</span>
                 <button type="button" onclick="signOut()" class="btn-link-signout">Sign Out</button>
             `;
         }
 
-        const phoneEl = document.getElementById("customer-phone");
-        const nameEl = document.getElementById("customer-name");
-        const officeEl = document.getElementById("workplace-select");
-
-        if (phoneEl) phoneEl.value = savedPhone;
-        if (nameEl) nameEl.value = savedName;
-        if (officeEl && savedOffice) officeEl.value = savedOffice;
+        if (document.getElementById("customer-phone")) document.getElementById("customer-phone").value = savedPhone;
+        if (document.getElementById("customer-title")) document.getElementById("customer-title").value = savedTitle || "";
+        if (document.getElementById("customer-first-name")) document.getElementById("customer-first-name").value = savedFirstName;
+        if (document.getElementById("customer-last-name")) document.getElementById("customer-last-name").value = savedLastName || "";
+        if (document.getElementById("workplace-select") && savedOffice) document.getElementById("workplace-select").value = savedOffice;
 
         loadPastPurchases(savedPhone);
     } else {
-        // Guest User: Render Quick-Login Bar with Explicit Button
         if (stateBar) {
             stateBar.style.display = "flex";
             stateBar.innerHTML = `
@@ -54,24 +55,41 @@ function autoPopulateSavedCustomer() {
                 </div>
             `;
         }
-        
         resetAccountDrawerUI();
     }
 }
 
-// 2. QUICK LOGIN TRIGGER (WITH LOADING STATE)
-async function triggerQuickLogin() {
-    const input = document.getElementById("quick-phone");
-    const btn = document.getElementById("btn-quick-login");
+// 2. SIGN-OUT FIX
+function signOut() {
+    localStorage.removeItem("padesk_phone");
+    localStorage.removeItem("padesk_title");
+    localStorage.removeItem("padesk_first_name");
+    localStorage.removeItem("padesk_last_name");
+    localStorage.removeItem("padesk_office");
     
-    if (input && input.value) {
-        if (btn) btn.innerText = "⏳"; // Show loading
-        await checkReturningCustomer(input.value, true);
-        if (btn && btn.innerText === "⏳") btn.innerText = "Go"; // Reset button
+    // Clear legacy cache if it exists
+    localStorage.removeItem("padesk_name"); 
+
+    if (document.getElementById("customer-phone")) document.getElementById("customer-phone").value = "";
+    if (document.getElementById("customer-title")) document.getElementById("customer-title").value = "";
+    if (document.getElementById("customer-first-name")) document.getElementById("customer-first-name").value = "";
+    if (document.getElementById("customer-last-name")) document.getElementById("customer-last-name").value = "";
+    if (document.getElementById("workplace-select")) document.getElementById("workplace-select").value = "";
+
+    const pastSection = document.getElementById("past-purchases-section");
+    if (pastSection) pastSection.style.display = "none";
+
+    resetAccountDrawerUI();
+
+    const accountDrawer = document.getElementById("account-drawer");
+    if (accountDrawer && accountDrawer.classList.contains("open")) {
+        toggleAccountDrawer();
     }
+
+    autoPopulateSavedCustomer();
 }
 
-// 3. DYNAMIC CUSTOMER LOOKUP (WITH FEEDBACK ALERTS)
+// 3. DYNAMIC CUSTOMER LOOKUP
 async function checkReturningCustomer(phone, isQuickLogin = false) {
     const cleanPhone = phone.trim();
     if (cleanPhone.length < 9) {
@@ -86,27 +104,121 @@ async function checkReturningCustomer(phone, isQuickLogin = false) {
         .single();
 
     if (customer) {
-        const nameEl = document.getElementById("customer-name");
-        const officeEl = document.getElementById("workplace-select");
-        const phoneEl = document.getElementById("customer-phone");
+        if (document.getElementById("customer-title")) document.getElementById("customer-title").value = customer.title || "";
+        if (document.getElementById("customer-first-name")) document.getElementById("customer-first-name").value = customer.first_name || "";
+        if (document.getElementById("customer-last-name")) document.getElementById("customer-last-name").value = customer.last_name || "";
+        if (document.getElementById("workplace-select")) document.getElementById("workplace-select").value = customer.default_office || "";
+        if (document.getElementById("customer-phone")) document.getElementById("customer-phone").value = customer.phone_number;
 
-        if (nameEl) nameEl.value = customer.full_name;
-        if (officeEl) officeEl.value = customer.default_office;
-        if (phoneEl) phoneEl.value = customer.phone_number;
-
-        // Cache the login locally
         localStorage.setItem("padesk_phone", customer.phone_number);
-        localStorage.setItem("padesk_name", customer.full_name);
-        localStorage.setItem("padesk_office", customer.default_office);
+        localStorage.setItem("padesk_title", customer.title || "");
+        localStorage.setItem("padesk_first_name", customer.first_name || "");
+        localStorage.setItem("padesk_last_name", customer.last_name || "");
+        localStorage.setItem("padesk_office", customer.default_office || "");
 
-        // Refresh the UI
         autoPopulateSavedCustomer();
         
-        if (isQuickLogin) alert(`Welcome back, ${customer.full_name}! Your profile and past purchases have been loaded.`);
+        if (isQuickLogin) {
+            const displayName = customer.title && customer.last_name ? `${customer.title} ${customer.last_name}` : customer.first_name;
+            alert(`Welcome back, ${displayName}! Your profile and past purchases have been loaded.`);
+        }
     } else {
         if (isQuickLogin) {
             alert("No account found for this number. If you are new, simply build your combo and checkout below to create your account!");
         }
+    }
+}
+
+// UPDATE FOR ACCOUNT DRAWER UI
+async function loadAccountHistory(phone) {
+    const profileBox = document.getElementById("account-profile-info");
+    const historyList = document.getElementById("account-order-history");
+    const signOutBtn = document.getElementById("drawer-signout-btn");
+
+    const savedTitle = localStorage.getItem("padesk_title") || "";
+    const savedFirstName = localStorage.getItem("padesk_first_name") || "Valued Shopper";
+    const savedLastName = localStorage.getItem("padesk_last_name") || "";
+    const savedOffice = localStorage.getItem("padesk_office") || "Not set";
+
+    if (profileBox) {
+        profileBox.innerHTML = `
+            <strong>${savedTitle} ${savedFirstName} ${savedLastName}</strong><br>
+            <small>📱 Phone: ${phone}</small><br>
+            <small>🏢 Office: ${savedOffice}</small>
+        `;
+    }
+
+    if (signOutBtn) signOutBtn.style.display = "block";
+
+    const { data: orders } = await db.from('orders').select('*').eq('customer_phone', phone).order('id', { ascending: false });
+
+    if (historyList) {
+        if (!orders || orders.length === 0) {
+            historyList.innerHTML = "<p><small>No past orders found.</small></p>";
+        } else {
+            historyList.innerHTML = orders.map(o => `
+                <div class="order-card-mini">
+                    <div style="display:flex; justify-content:space-between;">
+                        <strong>Order #${o.id}</strong>
+                        <span style="color:#0baf65; font-weight:bold;">K ${parseFloat(o.total_amount).toFixed(2)}</span>
+                    </div>
+                    <small style="color:#718096;">Location: ${o.delivery_location || '-'}</small>
+                </div>
+            `).join('');
+        }
+    }
+}
+
+// UPDATE FOR CHECKOUT LOGIC
+async function handleCheckout(event) {
+    event.preventDefault();
+    const items = Object.values(cart);
+    const totalCount = items.reduce((sum, item) => sum + item.qty, 0);
+    const totalPrice = items.reduce((sum, item) => {
+        const p = item.product.deal_price ? item.product.deal_price : item.product.price;
+        return sum + (parseFloat(p) * item.qty);
+    }, 0);
+
+    if (totalCount < 3 || totalPrice < 249.00) return alert("Combo criteria not met!");
+
+    const contactPhone = document.getElementById("customer-phone").value.trim();
+    const cTitle = document.getElementById("customer-title").value;
+    const cFirstName = document.getElementById("customer-first-name").value.trim();
+    const cLastName = document.getElementById("customer-last-name").value.trim();
+    const selectedOffice = document.getElementById("workplace-select").value;
+
+    const { error: custError } = await db.from('customers').upsert([{
+        phone_number: contactPhone,
+        title: cTitle,
+        first_name: cFirstName,
+        last_name: cLastName,
+        default_office: selectedOffice,
+        last_order_at: new Date().toISOString()
+    }], { onConflict: 'phone_number' });
+
+    if (custError) console.error("Customer record creation error:", custError.message);
+
+    const { error: orderError } = await db.from('orders').insert([{
+        customer_phone: contactPhone,
+        delivery_location: selectedOffice,
+        total_amount: totalPrice,
+        order_items_json: items,
+        status: 'Pending Aggregation'
+    }]);
+
+    if (orderError) {
+        alert("Error submitting order: " + orderError.message);
+    } else {
+        localStorage.setItem("padesk_phone", contactPhone);
+        localStorage.setItem("padesk_title", cTitle);
+        localStorage.setItem("padesk_first_name", cFirstName);
+        localStorage.setItem("padesk_last_name", cLastName);
+        localStorage.setItem("padesk_office", selectedOffice);
+
+        cart = {};
+        updateCartUI();
+        autoPopulateSavedCustomer();
+        alert(`Zikomo ${cTitle} ${cLastName || cFirstName}! Your combo order has been submitted successfully.`);
     }
 }
 
