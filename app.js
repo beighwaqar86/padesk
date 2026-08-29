@@ -272,7 +272,7 @@ function toggleSidebar() {
     }
 }
 
-// 8. RESTORED BANNERS SLIDER LOGIC
+// 8. READY-MADE COMBO BANNERS SLIDER
 async function loadBanners() {
     const { data: banners } = await db.from('banners').select('*').eq('is_active', true);
     if (!banners || banners.length === 0) return;
@@ -281,14 +281,27 @@ async function loadBanners() {
     const dotsContainer = document.getElementById("slider-dots");
 
     if (container) {
-        container.innerHTML = banners.map(b => `
-            <div class="banner-card" style="background-image: url('${b.image_url}');">
-                <div class="banner-overlay">
-                    <h4>${b.title || ''}</h4>
-                    <p>${b.subtitle || ''}</p>
+        container.innerHTML = banners.map(b => {
+            const encodedItems = b.items_json ? encodeURIComponent(JSON.stringify(b.items_json)) : '';
+            const comboTitle = b.title || 'Combo';
+
+            return `
+                <div class="banner-card" style="background-image: url('${b.image_url}');">
+                    <div class="banner-overlay" style="display: flex; justify-content: space-between; align-items: flex-end;">
+                        <div>
+                            <span style="background: #0baf65; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.6rem; font-weight: bold; text-transform: uppercase;">Ready Combo</span>
+                            <h4 style="margin: 4px 0 2px; font-size: 0.95rem;">${b.title || ''}</h4>
+                            <p style="margin: 0; font-size: 0.75rem; opacity: 0.95;">${b.subtitle || ''}</p>
+                        </div>
+                        ${b.items_json ? `
+                            <button type="button" onclick="addBannerComboToCart('${encodedItems}', '${comboTitle}')" class="btn-add-combo" style="background: #0baf65; color: white; border: none; padding: 8px 12px; border-radius: 8px; font-weight: 800; font-size: 0.75rem; cursor: pointer; white-space: nowrap; box-shadow: 0 2px 6px rgba(0,0,0,0.2);">
+                                + Add Combo
+                            </button>
+                        ` : ''}
+                    </div>
                 </div>
-            </div>
-        `).join('');
+            `;
+        }).join('');
 
         if (dotsContainer) {
             dotsContainer.innerHTML = banners.map((_, idx) => `
@@ -298,6 +311,36 @@ async function loadBanners() {
 
         startAutoSlide(banners.length);
         container.addEventListener('scroll', () => syncDotsOnScroll(banners.length));
+    }
+}
+
+function addBannerComboToCart(encodedItems, comboTitle) {
+    try {
+        const decodedString = decodeURIComponent(encodedItems);
+        const comboItems = JSON.parse(decodedString);
+
+        if (!Array.isArray(comboItems) || comboItems.length === 0) {
+            return alert("No items found in this combo.");
+        }
+
+        comboItems.forEach(ci => {
+            const product = ci.product;
+            const qty = ci.qty || 1;
+
+            if (product && product.id) {
+                if (cart[product.id]) {
+                    cart[product.id].qty += qty;
+                } else {
+                    cart[product.id] = { product: product, qty: qty };
+                }
+            }
+        });
+
+        updateCartUI();
+        alert(`⚡ "${comboTitle}" added to your cart successfully! Check your minimum combo criteria below.`);
+    } catch (e) {
+        console.error("Error adding combo:", e);
+        alert("Could not process this combo items list.");
     }
 }
 
