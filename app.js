@@ -283,4 +283,19 @@ async function handleCheckout(event) {
         cart = {};
         updateCartUI();
     }
+    function toggleSidebar() {
+    const sidebar = document.getElementById("filter-sidebar");
+    const overlay = document.getElementById("filter-sidebar-overlay");
+    
+    if (sidebar && overlay) {
+        const isOpen = sidebar.classList.contains("open");
+        if (isOpen) {
+            sidebar.classList.remove("open");
+            overlay.style.display = "none";
+        } else {
+            sidebar.classList.add("open");
+            overlay.style.display = "block";
+        }
+    }
+}
 }
