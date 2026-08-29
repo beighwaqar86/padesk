@@ -1,3 +1,4 @@
+// YOUR LIVE SUPABASE KEYS
 const SUPABASE_URL = "https://cziefuaclocpwicwjprb.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_j_MkiOlGUZOBsR8TSxIM1w_pnQ_B1xx";
 
@@ -14,6 +15,7 @@ window.onload = function() {
     autoPopulateSavedCustomer();
 };
 
+// 1. AUTO-POPULATE & STATE BAR ENGINE
 function autoPopulateSavedCustomer() {
     const savedPhone = localStorage.getItem("padesk_phone");
     const savedTitle = localStorage.getItem("padesk_title") || "";
@@ -55,6 +57,7 @@ function autoPopulateSavedCustomer() {
     }
 }
 
+// 2. SIGN-OUT FUNCTION
 function signOut() {
     localStorage.removeItem("padesk_phone");
     localStorage.removeItem("padesk_title");
@@ -101,6 +104,7 @@ function resetAccountDrawerUI() {
     }
 }
 
+// 3. QUICK LOGIN TRIGGER
 async function triggerQuickLogin() {
     const input = document.getElementById("quick-phone");
     const btn = document.getElementById("btn-quick-login");
@@ -112,6 +116,7 @@ async function triggerQuickLogin() {
     }
 }
 
+// 4. DYNAMIC CUSTOMER LOOKUP
 async function checkReturningCustomer(phone, isQuickLogin = false) {
     const cleanPhone = phone.trim();
     if (cleanPhone.length < 9) {
@@ -156,6 +161,7 @@ async function checkReturningCustomer(phone, isQuickLogin = false) {
     }
 }
 
+// 5. LOAD PAST PURCHASES SLIDER
 async function loadPastPurchases(phone) {
     const { data: orders } = await db
         .from('orders')
@@ -192,6 +198,7 @@ async function loadPastPurchases(phone) {
     }
 }
 
+// 6. ACCOUNT DETAILS DRAWER TOGGLE & HISTORY FETCH
 function toggleAccountDrawer() {
     const drawer = document.getElementById("account-drawer");
     const overlay = document.getElementById("account-drawer-overlay");
@@ -254,6 +261,7 @@ async function loadAccountHistory(phone) {
     }
 }
 
+// 7. SIDEBAR DRAWER TOGGLE LOGIC
 function toggleSidebar() {
     const sidebar = document.getElementById("filter-sidebar");
     const overlay = document.getElementById("filter-sidebar-overlay");
@@ -264,6 +272,7 @@ function toggleSidebar() {
     }
 }
 
+// 8. HERO BANNER SLIDER LOGIC
 async function loadBanners() {
     const { data: banners } = await db.from('banners').select('*').eq('is_active', true);
     if (!banners || banners.length === 0) return;
@@ -317,7 +326,7 @@ function syncDotsOnScroll(totalSlides) {
     }
 }
 
-// 9. FETCH PRODUCTS FROM DATABASE MASTER (Mapped to lowercase 'category')
+// 9. FETCH PRODUCTS FROM DATABASE MASTER
 async function loadProducts() {
     const { data: products, error } = await db.from('products').select('*').eq('is_active', true);
     if (error || !products) {
@@ -330,17 +339,14 @@ async function loadProducts() {
     renderProducts(allProducts);
 }
 
-// 10. BUILD FILTERS & CIRCLE SHORTCUTS USING LOWERCASE 'category'
-// DYNAMICALLY BUILD BUSINESS MASTER SHORTCUTS
+// 10. HIERARCHICAL DRILL-DOWN FILTERS (BUSINESS -> CATEGORY -> SUBCATEGORY)
 function buildDynamicMasterFilters() {
-    // 1. Populate Dropdown Filters (Sidebar)
     const categories = ['ALL', ...new Set(allProducts.map(p => p.category).filter(Boolean))];
     const categorySelect = document.getElementById("filter-category");
     if (categorySelect) {
         categorySelect.innerHTML = categories.map(c => `<option value="${c}">${c}</option>`).join('');
     }
 
-    // 2. Build Business Level Circles (First Level)
     const businesses = ['ALL', ...new Set(allProducts.map(p => p.business).filter(Boolean))];
     const businessCircles = document.getElementById("business-circles");
     
@@ -349,7 +355,7 @@ function buildDynamicMasterFilters() {
         businessCircles.innerHTML = businesses.map((bus, idx) => `
             <div class="circle-item ${idx === 0 ? 'active' : ''}" onclick="selectBusinessCircle('${bus}', this)">
                 <div class="circle-icon">${icons[bus] || '🏢'}</div>
-                <span>${bus === 'ALL' ? 'All Businesses' : bus}</span>
+                <span>${bus}</span>
             </div>
         `).join('');
     }
@@ -357,20 +363,18 @@ function buildDynamicMasterFilters() {
     applyFilters();
 }
 
-// FIRST LEVEL: SELECT BUSINESS
 function selectBusinessCircle(businessName, element) {
     document.querySelectorAll('#business-circles .circle-item').forEach(el => el.classList.remove('active'));
     if (element) element.classList.add('active');
 
-    // Hide subcategory row initially
-    document.getElementById("subcategory-circles").style.display = 'none';
-
     const catCirclesContainer = document.getElementById("category-circles");
+    const subCirclesContainer = document.getElementById("subcategory-circles");
+    
+    subCirclesContainer.style.display = 'none';
 
     if (businessName === 'ALL') {
         catCirclesContainer.style.display = 'none';
     } else {
-        // Filter products belonging to this business to find available categories
         const busProducts = allProducts.filter(p => p.business === businessName);
         const categories = ['ALL', ...new Set(busProducts.map(p => p.category).filter(Boolean))];
 
@@ -379,7 +383,7 @@ function selectBusinessCircle(businessName, element) {
             catCirclesContainer.innerHTML = categories.map((cat, idx) => `
                 <div class="circle-item ${idx === 0 ? 'active' : ''}" onclick="selectCategoryCircle('${businessName}', '${cat}', this)">
                     <div class="circle-icon" style="width:48px; height:48px; font-size:1.1rem;">📂</div>
-                    <span style="font-size:0.68rem;">${cat === 'ALL' ? 'All Categories' : cat}</span>
+                    <span style="font-size:0.68rem;">${cat}</span>
                 </div>
             `).join('');
         } else {
@@ -390,7 +394,6 @@ function selectBusinessCircle(businessName, element) {
     applyFilters();
 }
 
-// SECOND LEVEL: DRILL DOWN TO CATEGORY
 function selectCategoryCircle(businessName, categoryName, element) {
     document.querySelectorAll('#category-circles .circle-item').forEach(el => el.classList.remove('active'));
     if (element) element.classList.add('active');
@@ -408,7 +411,7 @@ function selectCategoryCircle(businessName, categoryName, element) {
             subCirclesContainer.innerHTML = subcategories.map((sub, idx) => `
                 <div class="circle-item ${idx === 0 ? 'active' : ''}" onclick="selectSubcategoryCircle('${sub}', this)">
                     <div class="circle-icon" style="width:42px; height:42px; font-size:1rem;">📌</div>
-                    <span style="font-size:0.65rem;">${sub === 'ALL' ? 'All Sub-Categories' : sub}</span>
+                    <span style="font-size:0.65rem;">${sub}</span>
                 </div>
             `).join('');
         } else {
@@ -419,50 +422,11 @@ function selectCategoryCircle(businessName, categoryName, element) {
     applyFilters();
 }
 
-// THIRD LEVEL: DRILL DOWN TO SUB-CATEGORY
 function selectSubcategoryCircle(subName, element) {
     document.querySelectorAll('#subcategory-circles .circle-item').forEach(el => el.classList.remove('active'));
     if (element) element.classList.add('active');
 
     applyFilters();
-}
-
-// MODIFIED FILTER ENGINE INCORPORATING HIERARCHICAL SHORTCUTS
-function applyFilters() {
-    const activeBusinessEl = document.querySelector('#business-circles .circle-item.active span');
-    const activeCategoryEl = document.querySelector('#category-circles .circle-item.active span');
-    const activeSubcategoryEl = document.querySelector('#subcategory-circles .circle-item.active span');
-
-    const selectedBusiness = activeBusinessEl ? activeBusinessEl.innerText : 'All Businesses';
-    const selectedCategory = activeCategoryEl ? activeCategoryEl.innerText : 'All Categories';
-    const selectedSubcategory = activeSubcategoryEl ? activeSubcategoryEl.innerText : 'All Sub-Categories';
-
-    const searchQuery = (document.getElementById("search-input")?.value || "").toLowerCase().trim();
-
-    let filtered = allProducts;
-
-    if (selectedBusiness !== 'All Businesses' && selectedBusiness !== 'ALL') {
-        filtered = filtered.filter(p => p.business === selectedBusiness);
-    }
-    if (selectedCategory !== 'All Categories' && selectedCategory !== 'ALL') {
-        filtered = filtered.filter(p => p.category === selectedCategory);
-    }
-    if (selectedSubcategory !== 'All Sub-Categories' && selectedSubcategory !== 'ALL') {
-        filtered = filtered.filter(p => p.sub_category === selectedSubcategory);
-    }
-
-    if (searchQuery !== "") {
-        filtered = filtered.filter(p => 
-            (p.name && p.name.toLowerCase().includes(searchQuery)) ||
-            (p.product_code && p.product_code.toLowerCase().includes(searchQuery)) ||
-            (p.category && p.category.toLowerCase().includes(searchQuery)) ||
-            (p.sub_category && p.sub_category.toLowerCase().includes(searchQuery)) ||
-            (p.brand && p.brand.toLowerCase().includes(searchQuery)) ||
-            (p.business && p.business.toLowerCase().includes(searchQuery))
-        );
-    }
-
-    renderProducts(filtered);
 }
 
 function handleCategoryChange() {
@@ -488,30 +452,44 @@ function handleCategoryChange() {
     applyFilters();
 }
 
-function selectCircleCategory(catName, element) {
-    document.querySelectorAll('#category-circles .circle-item').forEach(el => el.classList.remove('active'));
-    if (element) element.classList.add('active');
-
-    const catSelect = document.getElementById("filter-category");
-    if (catSelect) {
-        catSelect.value = catName;
-        handleCategoryChange();
-    }
-}
-
-// 11. UNIVERSAL SEARCH & FILTER ENGINE (Mapped to lowercase 'category')
+// 11. UNIVERSAL SEARCH & HIERARCHICAL FILTER ENGINE
 function applyFilters() {
-    const cat = document.getElementById("filter-category")?.value || 'ALL';
-    const sub = document.getElementById("filter-subcategory")?.value || 'ALL';
-    const brand = document.getElementById("filter-brand")?.value || 'ALL';
+    const activeBusinessEl = document.querySelector('#business-circles .circle-item.active span');
+    const activeCategoryEl = document.querySelector('#category-circles .circle-item.active span');
+    const activeSubcategoryEl = document.querySelector('#subcategory-circles .circle-item.active span');
+
+    const selectedBusiness = activeBusinessEl ? activeBusinessEl.innerText : 'ALL';
+    const selectedCategory = activeCategoryEl ? activeCategoryEl.innerText : 'ALL';
+    const selectedSubcategory = activeSubcategoryEl ? activeSubcategoryEl.innerText : 'ALL';
+
+    const sidebarCat = document.getElementById("filter-category")?.value || 'ALL';
+    const sidebarSub = document.getElementById("filter-subcategory")?.value || 'ALL';
+    const sidebarBrand = document.getElementById("filter-brand")?.value || 'ALL';
     const searchQuery = (document.getElementById("search-input")?.value || "").toLowerCase().trim();
 
     let filtered = allProducts;
 
-    if (cat !== 'ALL') filtered = filtered.filter(p => p.category === cat);
-    if (sub !== 'ALL') filtered = filtered.filter(p => p.sub_category === sub);
-    if (brand !== 'ALL') filtered = filtered.filter(p => p.brand === brand);
+    // Apply Circular Shortcuts Hierarchy
+    if (selectedBusiness !== 'ALL') {
+        filtered = filtered.filter(p => p.business === selectedBusiness);
+    }
+    
+    const catContainer = document.getElementById("category-circles");
+    if (catContainer && catContainer.style.display !== 'none' && selectedCategory !== 'ALL') {
+        filtered = filtered.filter(p => p.category === selectedCategory);
+    }
 
+    const subContainer = document.getElementById("subcategory-circles");
+    if (subContainer && subContainer.style.display !== 'none' && selectedSubcategory !== 'ALL') {
+        filtered = filtered.filter(p => p.sub_category === selectedSubcategory);
+    }
+
+    // Apply Sidebar Filters
+    if (sidebarCat !== 'ALL') filtered = filtered.filter(p => p.category === sidebarCat);
+    if (sidebarSub !== 'ALL') filtered = filtered.filter(p => p.sub_category === sidebarSub);
+    if (sidebarBrand !== 'ALL') filtered = filtered.filter(p => p.brand === sidebarBrand);
+
+    // Apply Search Input
     if (searchQuery !== "") {
         filtered = filtered.filter(p => 
             (p.name && p.name.toLowerCase().includes(searchQuery)) ||
@@ -519,7 +497,7 @@ function applyFilters() {
             (p.category && p.category.toLowerCase().includes(searchQuery)) ||
             (p.sub_category && p.sub_category.toLowerCase().includes(searchQuery)) ||
             (p.brand && p.brand.toLowerCase().includes(searchQuery)) ||
-            (p.source && p.source.toLowerCase().includes(searchQuery))
+            (p.business && p.business.toLowerCase().includes(searchQuery))
         );
     }
 
@@ -555,6 +533,7 @@ function renderProducts(products) {
     }).join('');
 }
 
+// 12. QUANTITY BASKET & COMBO ENGINE
 function addToCart(product) {
     if (cart[product.id]) {
         cart[product.id].qty += 1;
@@ -624,6 +603,7 @@ function updateCartUI() {
     }
 }
 
+// 13. CHECKOUT WITH IMPLICIT CUSTOMER PROFILE UPSERT
 async function handleCheckout(event) {
     event.preventDefault();
     
