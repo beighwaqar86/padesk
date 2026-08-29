@@ -15,16 +15,30 @@ window.onload = function() {
     autoPopulateSavedCustomer();
 };
 
-// 1. AUTO-POPULATE LOCAL STORAGE DATA FOR RETURNING SHOPPERS
+// 1. AUTO-POPULATE & WELCOME BAR FOR RETURNING SHOPPERS
 function autoPopulateSavedCustomer() {
     const savedPhone = localStorage.getItem("padesk_phone");
     const savedName = localStorage.getItem("padesk_name");
     const savedOffice = localStorage.getItem("padesk_office");
 
+    const welcomeBar = document.getElementById("welcome-bar");
+    const welcomeName = document.getElementById("welcome-name");
+
     if (savedPhone) {
         const phoneEl = document.getElementById("customer-phone");
         if (phoneEl) phoneEl.value = savedPhone;
+
+        if (welcomeBar && welcomeName && savedName) {
+            welcomeName.innerText = savedName;
+            welcomeBar.style.display = "flex";
+        }
+
+        loadPastPurchases(savedPhone);
+        loadAccountHistory(savedPhone);
+    } else if (welcomeBar) {
+        welcomeBar.style.display = "none";
     }
+
     if (savedName) {
         const nameEl = document.getElementById("customer-name");
         if (nameEl) nameEl.value = savedName;
@@ -35,7 +49,28 @@ function autoPopulateSavedCustomer() {
     }
 }
 
-// 2. DYNAMIC CUSTOMER LOOKUP ON PHONE INPUT
+// 2. SIGN-OUT FUNCTION
+function signOut() {
+    localStorage.removeItem("padesk_phone");
+    localStorage.removeItem("padesk_name");
+    localStorage.removeItem("padesk_office");
+
+    document.getElementById("customer-phone").value = "";
+    document.getElementById("customer-name").value = "";
+    document.getElementById("workplace-select").value = "";
+
+    document.getElementById("welcome-bar").style.display = "none";
+    document.getElementById("past-purchases-section").style.display = "none";
+
+    const accountDrawer = document.getElementById("account-drawer");
+    if (accountDrawer && accountDrawer.classList.contains("open")) {
+        toggleAccountDrawer();
+    }
+
+    alert("You have been signed out.");
+}
+
+// 3. DYNAMIC CUSTOMER LOOKUP ON PHONE INPUT
 async function checkReturningCustomer(phone) {
     const cleanPhone = phone.trim();
     if (cleanPhone.length < 10) return;
@@ -50,12 +85,120 @@ async function checkReturningCustomer(phone) {
         const nameEl = document.getElementById("customer-name");
         const officeEl = document.getElementById("workplace-select");
 
-        if (nameEl && !nameEl.value) nameEl.value = customer.full_name;
-        if (officeEl && !officeEl.value) officeEl.value = customer.default_office;
+        if (nameEl) nameEl.value = customer.full_name;
+        if (officeEl) officeEl.value = customer.default_office;
+
+        localStorage.setItem("padesk_phone", customer.phone_number);
+        localStorage.setItem("padesk_name", customer.full_name);
+        localStorage.setItem("padesk_office", customer.default_office);
+
+        const welcomeBar = document.getElementById("welcome-bar");
+        const welcomeName = document.getElementById("welcome-name");
+        if (welcomeBar && welcomeName) {
+            welcomeName.innerText = customer.full_name;
+            welcomeBar.style.display = "flex";
+        }
+
+        loadPastPurchases(cleanPhone);
+        loadAccountHistory(cleanPhone);
     }
 }
 
-// 3. SIDEBAR TOGGLE LOGIC
+// 4. LOAD PAST PURCHASES SLIDER (FOR REORDER HINT)
+async function loadPastPurchases(phone) {
+    const { data: orders } = await db
+        .from('orders')
+        .select('order_items_json')
+        .eq('customer_phone', phone);
+
+    if (!orders || orders.length === 0) return;
+
+    const pastItemsMap = {};
+    orders.forEach(o => {
+        const items = o.order_items_json || [];
+        items.forEach(item => {
+            const p = item.product;
+            if (p && !pastItemsMap[p.id]) pastItemsMap[p.id] = p;
+        });
+    });
+
+    const uniquePastProducts = Object.values(pastItemsMap);
+    const sliderContainer = document.getElementById("past-purchases-slider");
+    const sectionContainer = document.getElementById("past-purchases-section");
+
+    if (uniquePastProducts.length > 0 && sliderContainer && sectionContainer) {
+        sectionContainer.style.display = "block";
+        sliderContainer.innerHTML = uniquePastProducts.map(p => `
+            <div class="past-card">
+                <div>
+                    <span class="brand-tag">${p.brand || 'General'}</span>
+                    <h5>${p.name}</h5>
+                    <div class="price" style="font-size:0.8rem; margin:2px 0;">K ${parseFloat(p.deal_price || p.price).toFixed(2)}</div>
+                </div>
+                <button onclick='addToCart(${JSON.stringify(p)})' class="btn-add" style="padding:4px 8px; font-size:0.75rem;">+ Reorder</button>
+            </div>
+        `).join('');
+    }
+}
+
+// 5. ACCOUNT DETAILS DRAWER TOGGLE & HISTORY FETCH
+function toggleAccountDrawer() {
+    const drawer = document.getElementById("account-drawer");
+    const overlay = document.getElementById("account-drawer-overlay");
+    if (drawer && overlay) {
+        const isOpen = drawer.classList.contains("open");
+        drawer.classList.toggle("open");
+        overlay.style.display = isOpen ? "none" : "block";
+
+        const savedPhone = localStorage.getItem("padesk_phone");
+        if (!isOpen && savedPhone) {
+            loadAccountHistory(savedPhone);
+        }
+    }
+}
+
+async function loadAccountHistory(phone) {
+    const profileBox = document.getElementById("account-profile-info");
+    const historyList = document.getElementById("account-order-history");
+    const signOutBtn = document.getElementById("drawer-signout-btn");
+
+    const savedName = localStorage.getItem("padesk_name") || "Valued Shopper";
+    const savedOffice = localStorage.getItem("padesk_office") || "Not set";
+
+    if (profileBox) {
+        profileBox.innerHTML = `
+            <strong>${savedName}</strong><br>
+            <small>📱 Phone: ${phone}</small><br>
+            <small>🏢 Office: ${savedOffice}</small>
+        `;
+    }
+
+    if (signOutBtn) signOutBtn.style.display = "block";
+
+    const { data: orders } = await db
+        .from('orders')
+        .select('*')
+        .eq('customer_phone', phone)
+        .order('id', { ascending: false });
+
+    if (historyList) {
+        if (!orders || orders.length === 0) {
+            historyList.innerHTML = "<p><small>No past orders found.</small></p>";
+        } else {
+            historyList.innerHTML = orders.map(o => `
+                <div class="order-card-mini">
+                    <div style="display:flex; justify-content:space-between;">
+                        <strong>Order #${o.id}</strong>
+                        <span style="color:#0baf65; font-weight:bold;">K ${parseFloat(o.total_amount).toFixed(2)}</span>
+                    </div>
+                    <small style="color:#718096;">Location: ${o.delivery_location || '-'}</small>
+                </div>
+            `).join('');
+        }
+    }
+}
+
+// 6. SIDEBAR DRAWER TOGGLE LOGIC
 function toggleSidebar() {
     const sidebar = document.getElementById("filter-sidebar");
     const overlay = document.getElementById("filter-sidebar-overlay");
@@ -66,7 +209,7 @@ function toggleSidebar() {
     }
 }
 
-// 4. HERO BANNER SLIDER LOGIC
+// 7. HERO BANNER SLIDER LOGIC
 async function loadBanners() {
     const { data: banners } = await db.from('banners').select('*').eq('is_active', true);
     if (!banners || banners.length === 0) return;
@@ -120,7 +263,7 @@ function syncDotsOnScroll(totalSlides) {
     }
 }
 
-// 5. FETCH PRODUCTS FROM DATABASE MASTER
+// 8. FETCH PRODUCTS FROM DATABASE MASTER
 async function loadProducts() {
     const { data: products, error } = await db.from('products').select('*');
     if (error || !products) {
@@ -133,7 +276,7 @@ async function loadProducts() {
     renderProducts(allProducts);
 }
 
-// 6. BUILD FILTERS & CIRCLE SHORTCUTS DYNAMICALLY FROM DB MASTER
+// 9. BUILD FILTERS & CIRCLE SHORTCUTS DYNAMICALLY FROM DB MASTER
 function buildDynamicMasterFilters() {
     const categories = ['ALL', ...new Set(allProducts.map(p => p.category).filter(Boolean))];
     const categorySelect = document.getElementById("filter-category");
@@ -189,7 +332,7 @@ function selectCircleCategory(catName, element) {
     }
 }
 
-// 7. UNIVERSAL SEARCH & FILTER ENGINE
+// 10. UNIVERSAL SEARCH & FILTER ENGINE
 function applyFilters() {
     const cat = document.getElementById("filter-category")?.value || 'ALL';
     const sub = document.getElementById("filter-subcategory")?.value || 'ALL';
@@ -245,7 +388,7 @@ function renderProducts(products) {
     }).join('');
 }
 
-// 8. QUANTITY BASKET & COMBO ENGINE
+// 11. QUANTITY BASKET & COMBO ENGINE
 function addToCart(product) {
     if (cart[product.id]) {
         cart[product.id].qty += 1;
@@ -315,7 +458,7 @@ function updateCartUI() {
     }
 }
 
-// 9. CHECKOUT WITH IMPLICIT CUSTOMER PROFILE UPSERT
+// 12. CHECKOUT WITH IMPLICIT CUSTOMER PROFILE UPSERT
 async function handleCheckout(event) {
     event.preventDefault();
     const items = Object.values(cart);
@@ -355,7 +498,6 @@ async function handleCheckout(event) {
     if (orderError) {
         alert("Error submitting order: " + orderError.message);
     } else {
-        // Save to LocalStorage for instant recognition on next visit
         localStorage.setItem("padesk_phone", contactPhone);
         localStorage.setItem("padesk_name", customerName);
         localStorage.setItem("padesk_office", selectedOffice);
@@ -363,5 +505,6 @@ async function handleCheckout(event) {
         alert(`Zikomo ${customerName}! Your combo order has been submitted successfully.`);
         cart = {};
         updateCartUI();
+        autoPopulateSavedCustomer();
     }
 }
