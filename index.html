@@ -3,34 +3,33 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PaDesk - Direct Office Delivery</title>
+    <title>PaDesk - Office Combo Shop</title>
     <link rel="stylesheet" href="style.css">
-    <!-- Load Supabase JS Library -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
-    <div id="login-banner" class="banner">
-        <p>👋 Welcome! Save time on grocery runs.</p>
-    </div>
-
     <header>
-        <div><strong>PaDesk</strong> | Office Gate Delivery</div>
+        <div><strong>PaDesk</strong> | Custom Office Combos</div>
     </header>
 
     <div class="delivery-ticker">
-        🚛 Next batch delivery: Tuesday & Thursday
+        🚛 Gate Delivery: Tuesdays & Thursdays | Min Combo: 3 Items & K249 Total
     </div>
 
     <main>
-        <h2>🔥 Payday Super Bundles</h2>
-        <div id="product-list" class="product-grid"></div>
+        <h2>📦 Build Your Custom Combo</h2>
+        <div id="product-list" class="product-grid">Loading products...</div>
     </main>
 
     <section id="cart-section" class="cart-card">
-        <h3>🛒 Your Basket</h3>
+        <h3>🛒 Your Combo Selection</h3>
         <ul id="cart-items"></ul>
-        <div class="total-price">Total: K <span id="cart-total">0.00</span></div>
         
+        <div class="combo-tracker">
+            <p id="item-count-rule">❌ Items selected: 0 / 3 minimum</p>
+            <p id="price-rule">❌ Combo total: K 0.00 / K 249.00 minimum</p>
+        </div>
+
         <form id="checkout-form" onsubmit="handleCheckout(event)">
             <label for="workplace-select">Select Delivery Point:</label>
             <select id="workplace-select" required>
@@ -40,10 +39,10 @@
                 <option value="Zanaco HQ">Zanaco HQ (Cairo Road)</option>
             </select>
 
-            <label for="customer-phone">WhatsApp Number (for delivery call):</label>
+            <label for="customer-phone">WhatsApp Number:</label>
             <input type="tel" id="customer-phone" placeholder="e.g. 0977123456" required>
 
-            <button type="submit" class="btn-primary">Confirm & Order Pa-Desk</button>
+            <button type="submit" id="checkout-btn" class="btn-primary" disabled>Build Min. K249 Combo to Order</button>
         </form>
     </section>
 
