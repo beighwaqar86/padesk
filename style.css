@@ -378,7 +378,57 @@ body {
 }
 
 .past-card h5 { margin: 4px 0; font-size: 0.8rem; }
+/* Modern Checkout Form Styles */
+.checkout-group {
+    margin-bottom: 16px;
+}
 
+.checkout-group label {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #4a5568;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+}
+
+.form-input {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #cbd5e0;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    box-sizing: border-box;
+    background: #f8fafc;
+    transition: all 0.2s ease;
+}
+
+.form-input:focus {
+    outline: none;
+    border-color: #0baf65;
+    background: white;
+    box-shadow: 0 0 0 3px rgba(11, 175, 101, 0.1);
+}
+
+.customer-details-card {
+    background: white;
+    border: 1px solid #e2e8f0;
+    padding: 16px;
+    border-radius: 12px;
+    margin-bottom: 16px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+}
+
+.name-grid {
+    display: grid;
+    grid-template-columns: 90px 1fr;
+    gap: 12px;
+    margin-top: 10px;
+}
+
+.name-grid .full-width {
+    grid-column: 1 / -1;
+}
 /* Cart Sheet */
 .cart-card {
     background: white;
