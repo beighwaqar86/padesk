@@ -70,6 +70,31 @@ form input, form select {
     border: 1px solid #cbd5e0;
     border-radius: 6px;
 }
+.btn-add {
+    background-color: #0baf65;
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    width: 100%;
+    font-weight: bold;
+}
+
+.combo-tracker {
+    background-color: #f7fafc;
+    border: 1px dashed #cbd5e0;
+    padding: 10px;
+    border-radius: 6px;
+    margin: 15px 0;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+button:disabled {
+    background-color: #a0aec0 !important;
+    cursor: not-allowed;
+}
 
 .btn-primary {
     background-color: var(--primary-color);
