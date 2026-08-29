@@ -207,4 +207,52 @@ async function handleCheckout(event) {
         cart = {};
         updateCartUI();
     }
+    // Map Sub-Categories for Daily Needs Shortcuts
+const dailyNeedsSubMap = [
+    { name: 'All Daily', icon: '🧺', value: 'ALL' },
+    { name: 'Grocery', icon: '🌾', value: 'Grocery' },
+    { name: 'Household Essentials', icon: '🧹', value: 'Household Essentials' },
+    { name: 'Personal Care', icon: '🧴', value: 'Personal Care' },
+    { name: 'Baby Care', icon: '🍼', value: 'Baby Care' }
+];
+
+function selectCircleCategory(catName, element) {
+    // 1. Update visual active state on category circles
+    document.querySelectorAll('#category-circles .circle-item').forEach(el => el.classList.remove('active'));
+    element.classList.add('active');
+
+    // 2. Sync with existing dropdown filter
+    const catSelect = document.getElementById("filter-category");
+    if (catSelect) {
+        catSelect.value = catName === 'Daily Needs' ? 'Food Cupboard' : (catName === 'ALL' ? 'ALL' : catName);
+        handleCategoryChange();
+    }
+
+    // 3. Render Sub-Category Circle Shortcuts if "Daily Needs" is tapped
+    const subContainer = document.getElementById("subcategory-circles");
+    if (catName === 'Daily Needs') {
+        subContainer.style.display = 'flex';
+        subContainer.innerHTML = dailyNeedsSubMap.map((sub, index) => `
+            <div class="circle-item ${index === 0 ? 'active' : ''}" onclick="selectCircleSubcategory('${sub.value}', this)">
+                <div class="circle-icon">${sub.icon}</div>
+                <span>${sub.name}</span>
+            </div>
+        `).join('');
+    } else {
+        subContainer.style.display = 'none';
+    }
+}
+
+function selectCircleSubcategory(subValue, element) {
+    // 1. Update active state on subcategory circles
+    document.querySelectorAll('#subcategory-circles .circle-item').forEach(el => el.classList.remove('active'));
+    element.classList.add('active');
+
+    // 2. Sync with subcategory dropdown filter
+    const subSelect = document.getElementById("filter-subcategory");
+    if (subSelect) {
+        subSelect.value = subValue;
+        applyFilters();
+    }
+}
 }
