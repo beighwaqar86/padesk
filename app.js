@@ -16,6 +16,96 @@ window.onload = function() {
     autoPopulateSavedCustomer();
 };
 
+function autoPopulateSavedCustomer() {
+    const savedPhone = localStorage.getItem("padesk_phone");
+    const savedName = localStorage.getItem("padesk_name");
+    const savedOffice = localStorage.getItem("padesk_office");
+
+    if (savedPhone) {
+        const phoneEl = document.getElementById("customer-phone");
+        if (phoneEl) phoneEl.value = savedPhone;
+    }
+    if (savedName) {
+        const nameEl = document.getElementById("customer-name");
+        if (nameEl) nameEl.value = savedName;
+    }
+    if (savedOffice) {
+        const officeEl = document.getElementById("workplace-select");
+        if (officeEl) officeEl.value = savedOffice;
+    }
+}
+
+// 2. DYNAMIC LOOKUP: Check Supabase if shopper types a recognized phone number
+async function checkReturningCustomer(phone) {
+    const cleanPhone = phone.trim();
+    if (cleanPhone.length < 10) return;
+
+    const { data: customer } = await db
+        .from('customers')
+        .select('*')
+        .eq('phone_number', cleanPhone)
+        .single();
+
+    if (customer) {
+        const nameEl = document.getElementById("customer-name");
+        const officeEl = document.getElementById("workplace-select");
+
+        if (nameEl && !nameEl.value) nameEl.value = customer.full_name;
+        if (officeEl && !officeEl.value) officeEl.value = customer.default_office;
+    }
+}
+
+// 3. CHECKOUT: Upsert Customer Master Profile then Save Order
+async function handleCheckout(event) {
+    event.preventDefault();
+    const items = Object.values(cart);
+    const totalCount = items.reduce((sum, item) => sum + item.qty, 0);
+    const totalPrice = items.reduce((sum, item) => {
+        const p = item.product.deal_price ? item.product.deal_price : item.product.price;
+        return sum + (parseFloat(p) * item.qty);
+    }, 0);
+
+    if (totalCount < 3 || totalPrice < 249.00) return alert("Combo criteria not met!");
+
+    const contactPhone = document.getElementById("customer-phone").value.trim();
+    const customerName = document.getElementById("customer-name").value.trim();
+    const selectedOffice = document.getElementById("workplace-select").value;
+
+    // A. Upsert Customer Master Profile
+    const { error: custError } = await db.from('customers').upsert([{
+        phone_number: contactPhone,
+        full_name: customerName,
+        default_office: selectedOffice,
+        last_order_at: new Date().toISOString()
+    }], { onConflict: 'phone_number' });
+
+    if (custError) {
+        console.error("Customer upsert error:", custError.message);
+    }
+
+    // B. Save Order Entry
+    const { error: orderError } = await db.from('orders').insert([{
+        customer_phone: contactPhone,
+        delivery_location: selectedOffice,
+        total_amount: totalPrice,
+        order_items_json: items,
+        status: 'Pending Aggregation'
+    }]);
+
+    if (error = orderError) {
+        alert("Error submitting order: " + error.message);
+    } else {
+        // Cache profile in browser memory for instant recognition next time
+        localStorage.setItem("padesk_phone", contactPhone);
+        localStorage.setItem("padesk_name", customerName);
+        localStorage.setItem("padesk_office", selectedOffice);
+
+        alert(`Zikomo ${customerName}! Your combo order has been submitted successfully.`);
+        cart = {};
+        updateCartUI();
+    }
+}
+
 // 1. SIDEBAR TOGGLE LOGIC
 function toggleSidebar() {
     const sidebar = document.getElementById("filter-sidebar");
