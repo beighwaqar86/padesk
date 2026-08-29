@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PaDesk - Admin Product Master</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        .admin-container { padding: 20px; max-width: 900px; margin: 0 auto; }
+        .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; background: white; padding: 20px; border-radius: 12px; box-shadow: var(--card-shadow); }
+        .form-grid input, .form-grid select { padding: 8px; border: 1px solid #cbd5e0; border-radius: 6px; width: 100%; box-sizing: border-box; }
+        .admin-table { width: 100%; border-collapse: collapse; margin-top: 20px; background: white; border-radius: 12px; overflow: hidden; box-shadow: var(--card-shadow); }
+        .admin-table th, .admin-table td { padding: 10px; border-bottom: 1px solid #edf2f7; text-align: left; font-size: 0.85rem; }
+        .admin-table th { background: #1a202c; color: white; }
+    </style>
+</head>
+<body>
+    <header class="app-header">
+        <div class="brand">
+            <span class="brand-logo">⚙️</span>
+            <div>
+                <h1>PaDesk Admin</h1>
+                <small>Product Master Configurator</small>
+            </div>
+        </div>
+    </header>
+
+    <div class="admin-container">
+        <h3>➕ Add / Update Product Master</h3>
+        <form id="product-form" onsubmit="saveProduct(event)" class="form-grid">
+            <input type="hidden" id="prod-id">
+            <div><label><small>Product Code</small></label><input type="text" id="prod-code" required placeholder="P101"></div>
+            <div><label><small>Product Name</small></label><input type="text" id="prod-name" required placeholder="Breakfast Meal 10kg"></div>
+            <div><label><small>Regular Price (K)</small></label><input type="number" step="0.01" id="prod-price" required placeholder="135.00"></div>
+            <div><label><small>Deal Price (K)</small></label><input type="number" step="0.01" id="prod-deal-price" placeholder="120.00"></div>
+            <div><label><small>Category</small></label><input type="text" id="prod-category" required placeholder="Daily Needs"></div>
+            <div><label><small>Sub-Category</small></label><input type="text" id="prod-subcategory" required placeholder="Maize Meal"></div>
+            <div><label><small>Brand</small></label><input type="text" id="prod-brand" required placeholder="Breakfast"></div>
+            <div><label><small>Source Supplier</small></label><input type="text" id="prod-source" placeholder="National Milling"></div>
+            <div><label><small>Image URL</small></label><input type="url" id="prod-image" placeholder="https://..."></div>
+            
+            <div style="grid-column: 1 / -1; margin-top: 10px;">
+                <button type="submit" class="btn-primary">Save to Product Master</button>
+            </div>
+        </form>
+
+        <h3 style="margin-top: 30px;">📦 Active Inventory Master</h3>
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th>Code</th>
+                    <th>Name</th>
+                    <th>Price / Deal</th>
+                    <th>Category ➔ Sub</th>
+                    <th>Brand</th>
+                    <th>Source</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody id="admin-product-rows"></tbody>
+        </table>
+    </div>
+
+    <script src="admin.js"></script>
+</body>
+</html>
