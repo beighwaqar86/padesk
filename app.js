@@ -643,6 +643,7 @@ function updateCartUI() {
 }
 
 // 13. CHECKOUT PREVIEW MODAL FLOW
+// 13. CHECKOUT PREVIEW MODAL FLOW (FIXED PAYMENT DISPLAY)
 function handleCheckout(event) {
     event.preventDefault();
 
@@ -663,6 +664,14 @@ function handleCheckout(event) {
     const cFirstName = document.getElementById("customer-first-name").value.trim();
     const cLastName = document.getElementById("customer-last-name").value.trim();
     const selectedOffice = document.getElementById("workplace-select").value;
+    
+    const paymentSelect = document.getElementById("payment-method-select");
+    const paymentMethod = paymentSelect ? paymentSelect.value : "";
+
+    if (!paymentMethod) {
+        alert("Please select a payment option before checkout.");
+        return;
+    }
 
     document.getElementById("preview-customer-details").innerHTML = `
         <strong>${cTitle} ${cFirstName} ${cLastName}</strong><br>
@@ -680,6 +689,7 @@ function handleCheckout(event) {
         `;
     }).join('');
 
+    document.getElementById("preview-payment-method").innerText = paymentMethod;
     document.getElementById("preview-total-amount").innerText = `K ${totalPrice.toFixed(2)}`;
 
     document.getElementById("order-preview-modal").style.display = "flex";
