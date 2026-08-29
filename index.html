@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PaDesk - Direct Office Delivery</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Load Supabase JS Library -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <div id="login-banner" class="banner">
+        <p>👋 Welcome! Save time on grocery runs.</p>
+    </div>
+
+    <header>
+        <div><strong>PaDesk</strong> | Office Gate Delivery</div>
+    </header>
+
+    <div class="delivery-ticker">
+        🚛 Next batch delivery: Tuesday & Thursday
+    </div>
+
+    <main>
+        <h2>🔥 Payday Super Bundles</h2>
+        <div id="product-list" class="product-grid"></div>
+    </main>
+
+    <section id="cart-section" class="cart-card">
+        <h3>🛒 Your Basket</h3>
+        <ul id="cart-items"></ul>
+        <div class="total-price">Total: K <span id="cart-total">0.00</span></div>
+        
+        <form id="checkout-form" onsubmit="handleCheckout(event)">
+            <label for="workplace-select">Select Delivery Point:</label>
+            <select id="workplace-select" required>
+                <option value="">-- Choose your office --</option>
+                <option value="New Government Complex">New Government Complex (Independence Ave)</option>
+                <option value="Ministry of Finance">Ministry of Finance (Haile Selassie Ave)</option>
+                <option value="Zanaco HQ">Zanaco HQ (Cairo Road)</option>
+            </select>
+
+            <label for="customer-phone">WhatsApp Number (for delivery call):</label>
+            <input type="tel" id="customer-phone" placeholder="e.g. 0977123456" required>
+
+            <button type="submit" class="btn-primary">Confirm & Order Pa-Desk</button>
+        </form>
+    </section>
+
+    <script src="app.js"></script>
+</body>
+</html>
