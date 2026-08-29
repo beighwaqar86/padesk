@@ -274,31 +274,56 @@ function toggleSidebar() {
 
 // 8. HERO BANNER SLIDER LOGIC
 async function loadBanners() {
-    const { data: banners } = await db.from('banners').select('*').eq('is_active', true);
-    if (!banners || banners.length === 0) return;
+    // Fetch ready-made combos instead of basic banners
+    const { data: combos } = await db.from('combos').select('*').eq('is_active', true);
+    if (!combos || combos.length === 0) return;
 
     const container = document.getElementById("banner-carousel");
     const dotsContainer = document.getElementById("slider-dots");
 
     if (container) {
-        container.innerHTML = banners.map(b => `
-            <div class="banner-card" style="background-image: url('${b.image_url}');">
-                <div class="banner-overlay">
-                    <h4>${b.title || ''}</h4>
-                    <p>${b.subtitle || ''}</p>
+        container.innerHTML = combos.map(c => `
+            <div class="banner-card" style="background-image: url('${c.banner_image_url}');">
+                <div class="banner-overlay" style="display: flex; justify-content: space-between; align-items: flex-end;">
+                    <div>
+                        <span style="background: #0baf65; color: white; padding: 2px 8px; border-radius: 4px; font-size: 0.65rem; font-weight: bold;">READY-MADE COMBO</span>
+                        <h4 style="margin: 4px 0 2px; font-size: 0.95rem;">${c.title}</h4>
+                        <p style="margin: 0; font-size: 0.75rem;">${c.subtitle} • <strong>K ${parseFloat(c.combo_price).toFixed(2)}</strong></p>
+                    </div>
+                    <button onclick='addComboToCart(${JSON.stringify(c.items_json)})' class="btn-add" style="width: auto; padding: 6px 12px; font-size: 0.75rem; background: #0baf65; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer;">
+                        + Add Combo
+                    </button>
                 </div>
             </div>
         `).join('');
 
         if (dotsContainer) {
-            dotsContainer.innerHTML = banners.map((_, idx) => `
+            dotsContainer.innerHTML = combos.map((_, idx) => `
                 <span class="dot ${idx === 0 ? 'active' : ''}" id="dot-${idx}"></span>
             `).join('');
         }
 
-        startAutoSlide(banners.length);
-        container.addEventListener('scroll', () => syncDotsOnScroll(banners.length));
+        startAutoSlide(combos.length);
+        container.addEventListener('scroll', () => syncDotsOnScroll(combos.length));
     }
+}
+
+// 1-Tap Combo Adder
+function addComboToCart(comboItems) {
+    comboItems.forEach(ci => {
+        // ci expects { product: {...}, qty: number }
+        const product = ci.product;
+        const qty = ci.qty || 1;
+
+        if (cart[product.id]) {
+            cart[product.id].qty += qty;
+        } else {
+            cart[product.id] = { product: product, qty: qty };
+        }
+    });
+
+    updateCartUI();
+    alert("⚡ Ready-made combo added to your basket! Minimum criteria met.");
 }
 
 function startAutoSlide(totalSlides) {
