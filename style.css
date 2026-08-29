@@ -14,7 +14,7 @@ body {
     padding-bottom: 30px;
 }
 
-/* Header */
+/* Header & Welcome Bar */
 .app-header {
     background: white;
     padding: 12px 16px;
@@ -22,11 +22,45 @@ body {
     position: sticky;
     top: 0;
     z-index: 100;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 .brand { display: flex; align-items: center; gap: 10px; }
 .brand-logo { font-size: 1.8rem; }
 .brand h1 { margin: 0; font-size: 1.2rem; font-weight: 800; color: var(--dark); }
 .brand small { color: #718096; font-size: 0.75rem; }
+
+.btn-account {
+    background: #edf2f7;
+    border: 1px solid #cbd5e0;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-weight: 700;
+    font-size: 0.8rem;
+    cursor: pointer;
+}
+
+.welcome-bar {
+    background: #e6f7f0;
+    color: var(--primary-dark);
+    padding: 8px 16px;
+    font-size: 0.85rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #b2f5ea;
+}
+
+.btn-link-signout {
+    background: none;
+    border: none;
+    color: #e53e3e;
+    font-weight: 700;
+    font-size: 0.78rem;
+    cursor: pointer;
+    text-decoration: underline;
+}
 
 .delivery-ticker {
     background: var(--dark);
@@ -82,7 +116,6 @@ body {
 .banner-overlay h4 { margin: 0; font-size: 1rem; font-weight: 800; }
 .banner-overlay p { margin: 2px 0 0; font-size: 0.78rem; opacity: 0.9; }
 
-/* Slider Dots Indicator */
 .slider-dots {
     display: flex;
     justify-content: center;
@@ -159,11 +192,6 @@ body {
 
 .circle-item.active span { color: #0baf65; }
 
-.sub-circles {
-    padding-top: 6px;
-    border-top: 1px dashed #edf2f7;
-}
-
 /* Search Bar & Filter Toggle */
 .search-filter-bar {
     display: flex;
@@ -194,7 +222,7 @@ body {
     white-space: nowrap;
 }
 
-/* Sidebar Drawer */
+/* Sidebar & Account Drawers */
 .sidebar-overlay {
     position: fixed;
     top: 0;
@@ -209,8 +237,8 @@ body {
 .filter-sidebar {
     position: fixed;
     top: 0;
-    right: -300px;
-    width: 260px;
+    right: -320px;
+    width: 280px;
     height: 100vh;
     background: white;
     z-index: 201;
@@ -244,24 +272,32 @@ body {
     padding: 16px;
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 12px;
+    overflow-y: auto;
 }
 
-.sidebar-content label {
-    font-size: 0.7rem;
-    font-weight: bold;
-    text-transform: uppercase;
-    color: #a0aec0;
-}
-
-.sidebar-content select {
-    width: 100%;
-    padding: 10px;
-    font-size: 0.9rem;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
+.account-profile-box {
     background: #f7fafc;
-    margin-top: 4px;
+    border: 1px solid #e2e8f0;
+    padding: 12px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+}
+
+.order-history-list {
+    max-height: 250px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.order-card-mini {
+    background: #f8fafc;
+    border: 1px solid #edf2f7;
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 0.8rem;
 }
 
 /* Product Cards */
@@ -297,6 +333,37 @@ body {
     width: 100%;
 }
 
+/* Past Purchases Bottom Slider */
+.past-purchases-section {
+    padding: 0 16px 16px;
+}
+
+.past-purchases-slider {
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    padding-bottom: 8px;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+}
+
+.past-purchases-slider::-webkit-scrollbar { display: none; }
+
+.past-card {
+    min-width: 140px;
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 8px;
+    flex-shrink: 0;
+    scroll-snap-align: start;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.past-card h5 { margin: 4px 0; font-size: 0.8rem; }
+
 /* Cart Sheet */
 .cart-card {
     background: white;
@@ -316,6 +383,16 @@ body {
     border-radius: 8px;
     font-size: 0.95rem;
     font-weight: 800;
+    cursor: pointer;
+}
+.btn-danger {
+    background: #e53e3e;
+    color: white;
+    border: none;
+    padding: 10px;
+    width: 100%;
+    border-radius: 8px;
+    font-weight: bold;
     cursor: pointer;
 }
 button:disabled { background: #cbd5e0 !important; cursor: not-allowed; }
