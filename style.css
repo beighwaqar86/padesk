@@ -37,53 +37,71 @@ body {
     font-weight: 600;
 }
 
-/* Auto-Scrolling Marquee Banners */
+/* Hero Banner Touch Slider */
 .banner-section {
-    padding: 12px 0 4px;
-    overflow: hidden;
+    position: relative;
+    padding: 12px 16px 4px;
     background: white;
 }
 
 .banner-carousel {
     display: flex;
     gap: 12px;
-    width: max-content;
-    animation: marquee 22s linear infinite;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scroll-behavior: smooth;
+    padding-bottom: 8px;
+    -webkit-overflow-scrolling: touch;
 }
 
-.banner-carousel:hover,
-.banner-carousel:active {
-    animation-play-state: paused;
-}
+.banner-carousel::-webkit-scrollbar { display: none; }
 
 .banner-card {
-    width: 280px;
-    height: 130px;
-    border-radius: 12px;
+    min-width: 88%;
+    height: 145px;
+    border-radius: 14px;
     background-size: cover;
     background-position: center;
     position: relative;
+    scroll-snap-align: center;
     flex-shrink: 0;
     display: flex;
     align-items: flex-end;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
 }
 
 .banner-overlay {
-    background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
+    background: linear-gradient(transparent, rgba(0, 0, 0, 0.85));
     color: white;
-    padding: 10px 12px;
+    padding: 12px 14px;
     width: 100%;
-    border-bottom-left-radius: 12px;
-    border-bottom-right-radius: 12px;
+    border-bottom-left-radius: 14px;
+    border-bottom-right-radius: 14px;
 }
 
-.banner-overlay h4 { margin: 0; font-size: 0.95rem; }
-.banner-overlay p { margin: 2px 0 0; font-size: 0.75rem; opacity: 0.9; }
+.banner-overlay h4 { margin: 0; font-size: 1rem; font-weight: 800; }
+.banner-overlay p { margin: 2px 0 0; font-size: 0.78rem; opacity: 0.9; }
 
-@keyframes marquee {
-    0% { transform: translateX(0%); }
-    100% { transform: translateX(-50%); }
+/* Slider Dots Indicator */
+.slider-dots {
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    margin-top: 6px;
+}
+
+.dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #cbd5e0;
+    transition: all 0.3s ease;
+}
+
+.dot.active {
+    width: 20px;
+    border-radius: 10px;
+    background: #0baf65;
 }
 
 /* Circle Shortcuts */
