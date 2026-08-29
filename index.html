@@ -25,39 +25,20 @@
         🚛 Delivery: Tuesdays & Thursdays | Min Combo: 3 Items & K249 Total
     </div>
 
-    <!-- Main Banner Carousel Area -->
+    <!-- Main Auto-Scrolling Banner Marquee Area -->
     <section class="banner-section">
         <div id="banner-carousel" class="banner-carousel">
-            <!-- Dynamic Banners Load Here -->
+            <!-- Dynamic Marquee Banners Load Here -->
         </div>
     </section>
 
     <!-- Primary Category Circle Shortcuts -->
     <div class="circle-shortcuts-wrapper">
         <div class="circle-shortcuts-container" id="category-circles">
-            <div class="circle-item active" onclick="selectCircleCategory('ALL', this)">
-                <div class="circle-icon">🔥</div>
-                <span>All</span>
-            </div>
-            <div class="circle-item" onclick="selectCircleCategory('Daily Needs', this)">
-                <div class="circle-icon">🛒</div>
-                <span>Daily Needs</span>
-            </div>
-            <div class="circle-item" onclick="selectCircleCategory('Beauty', this)">
-                <div class="circle-icon">✨</div>
-                <span>Beauty</span>
-            </div>
-            <div class="circle-item" onclick="selectCircleCategory('Electronics', this)">
-                <div class="circle-icon">⚡</div>
-                <span>Electronics</span>
-            </div>
-            <div class="circle-item" onclick="selectCircleCategory('Deals', this)">
-                <div class="circle-icon">🏷️</div>
-                <span>Deals</span>
-            </div>
+            <!-- Dynamic Category Circles Render Here -->
         </div>
 
-        <!-- Sub-Category Shortcuts (Appears dynamically for Daily Needs) -->
+        <!-- Sub-Category Shortcuts -->
         <div class="circle-shortcuts-container sub-circles" id="subcategory-circles" style="display: none;">
             <!-- Dynamic Sub-category Circles Render Here -->
         </div>
@@ -68,7 +49,7 @@
         <input 
             type="text" 
             id="search-input" 
-            placeholder="🔍 Search name, category, brand..." 
+            placeholder="🔍 Search name, code, category, brand..." 
             oninput="applyFilters()"
         >
         <button type="button" class="btn-filter-toggle" onclick="toggleSidebar()">
@@ -105,6 +86,50 @@
             <input type="tel" id="customer-phone" placeholder="e.g. 0977123456" required>
 
             <button type="submit" id="checkout-btn" class="btn-primary" disabled>Build Min Combo (3 Items & K249) to Order</button>
+        </form>
+    </section>
+
+    <!-- Sliding Sidebar Overlay -->
+    <div id="filter-sidebar-overlay" class="sidebar-overlay" onclick="toggleSidebar()"></div>
+
+    <!-- Off-Canvas Filter Drawer -->
+    <aside id="filter-sidebar" class="filter-sidebar">
+        <div class="sidebar-header">
+            <h3>Filter Products</h3>
+            <button type="button" class="btn-close-sidebar" onclick="toggleSidebar()">✕</button>
+        </div>
+
+        <div class="sidebar-content">
+            <div class="filter-group">
+                <label>Category</label>
+                <select id="filter-category" onchange="handleCategoryChange()">
+                    <option value="ALL">All Categories</option>
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <label>Sub-Category</label>
+                <select id="filter-subcategory" onchange="applyFilters()">
+                    <option value="ALL">All Sub-Categories</option>
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <label>Brand</label>
+                <select id="filter-brand" onchange="applyFilters()">
+                    <option value="ALL">All Brands</option>
+                </select>
+            </div>
+
+            <button type="button" class="btn-primary" onclick="toggleSidebar()" style="margin-top: 20px;">
+                Apply Filters
+            </button>
+        </div>
+    </aside>
+
+    <script src="app.js"></script>
+</body>
+</html>
         </form>
     </section>
 
