@@ -1,110 +1,145 @@
 :root {
-    --primary-color: #0baf65;
-    --dark-neutral: #1a202c;
-    --light-bg: #f7fafc;
+    --primary: #0baf65;
+    --primary-dark: #088a4f;
+    --dark: #1a202c;
+    --gray-bg: #f8fafc;
+    --card-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     margin: 0;
-    padding: 0;
-    background-color: var(--light-bg);
-    color: var(--dark-neutral);
+    background-color: var(--gray-bg);
+    color: var(--dark);
+    padding-bottom: 30px;
 }
 
-.banner {
-    background-color: #ebf8ff;
-    padding: 10px;
-    text-align: center;
-    font-size: 0.9rem;
+/* Header */
+.app-header {
+    background: white;
+    padding: 12px 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    position: sticky;
+    top: 0;
+    z-index: 100;
 }
-
-header {
-    background-color: white;
-    padding: 15px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-}
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand-logo { font-size: 1.8rem; }
+.brand h1 { margin: 0; font-size: 1.2rem; font-weight: 800; color: var(--dark); }
+.brand small { color: #718096; font-size: 0.75rem; }
 
 .delivery-ticker {
-    background-color: var(--dark-neutral);
+    background: var(--dark);
     color: white;
+    font-size: 0.75rem;
     text-align: center;
-    padding: 8px;
-    font-size: 0.85rem;
+    padding: 6px;
+    font-weight: 600;
 }
 
+/* Banners */
+.banner-section { padding: 12px 16px 4px; }
+.banner-carousel {
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    padding-bottom: 8px;
+}
+.banner-card {
+    min-width: 85%;
+    height: 140px;
+    border-radius: 12px;
+    background-size: cover;
+    background-position: center;
+    position: relative;
+    scroll-snap-align: start;
+    flex-shrink: 0;
+    display: flex;
+    align-items: flex-end;
+}
+.banner-overlay {
+    background: linear-gradient(transparent, rgba(0,0,0,0.75));
+    color: white;
+    padding: 12px;
+    width: 100%;
+    border-bottom-left-radius: 12px;
+    border-bottom-right-radius: 12px;
+}
+.banner-overlay h4 { margin: 0; font-size: 1rem; }
+.banner-overlay p { margin: 2px 0 0; font-size: 0.75rem; opacity: 0.9; }
+
+/* Filter Bar */
+.filter-section {
+    display: flex;
+    gap: 8px;
+    padding: 8px 16px;
+    overflow-x: auto;
+    background: white;
+    border-bottom: 1px solid #edf2f7;
+}
+.filter-group { flex: 1; min-width: 110px; }
+.filter-group label { display: block; font-size: 0.65rem; text-transform: uppercase; color: #a0aec0; font-weight: 700; margin-bottom: 2px; }
+.filter-group select {
+    width: 100%;
+    padding: 6px;
+    font-size: 0.8rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    background: #f7fafc;
+}
+
+/* Product Cards */
+.content-container { padding: 16px; }
+.section-title { font-size: 1.1rem; margin-bottom: 12px; }
 .product-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-    gap: 15px;
-    padding: 15px;
+    grid-template-columns: repeat(auto-fill, minmax(145px, 1fr));
+    gap: 12px;
 }
-
 .product-card {
     background: white;
-    border-radius: 8px;
-    padding: 12px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    text-align: center;
+    border-radius: 12px;
+    padding: 10px;
+    box-shadow: var(--card-shadow);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+.product-card img { width: 100%; height: 100px; object-fit: cover; border-radius: 8px; }
+.product-card h4 { font-size: 0.85rem; margin: 8px 0 2px; font-weight: 700; }
+.product-card .brand-tag { font-size: 0.65rem; color: #718096; text-transform: uppercase; font-weight: bold; }
+.product-card .price { font-size: 0.95rem; font-weight: 800; color: var(--primary-dark); margin: 6px 0; }
+.btn-add {
+    background: var(--primary);
+    color: white;
+    border: none;
+    padding: 8px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
 }
 
+/* Cart Sheet */
 .cart-card {
     background: white;
-    margin: 15px;
-    padding: 20px;
-    border-radius: 12px;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+    margin: 16px;
+    padding: 16px;
+    border-radius: 16px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.1);
 }
-
-form label {
-    display: block;
-    margin-top: 12px;
-    font-weight: 600;
-}
-
-form input, form select {
-    width: 100%;
-    padding: 10px;
-    margin-top: 5px;
-    box-sizing: border-box;
-    border: 1px solid #cbd5e0;
-    border-radius: 6px;
-}
-.btn-add {
-    background-color: #0baf65;
-    color: white;
-    border: none;
-    padding: 8px 12px;
-    border-radius: 4px;
-    cursor: pointer;
-    width: 100%;
-    font-weight: bold;
-}
-
-.combo-tracker {
-    background-color: #f7fafc;
-    border: 1px dashed #cbd5e0;
-    padding: 10px;
-    border-radius: 6px;
-    margin: 15px 0;
-    font-size: 0.9rem;
-    font-weight: 600;
-}
-
-button:disabled {
-    background-color: #a0aec0 !important;
-    cursor: not-allowed;
-}
-
+.combo-tracker { display: flex; flex-direction: column; gap: 6px; margin: 12px 0; }
+.rule-badge { font-size: 0.8rem; font-weight: 700; padding: 6px 10px; border-radius: 6px; background: #f7fafc; }
 .btn-primary {
-    background-color: var(--primary-color);
+    background: var(--primary);
     color: white;
     border: none;
-    padding: 12px 20px;
+    padding: 14px;
     width: 100%;
-    border-radius: 6px;
-    font-size: 1rem;
-    font-weight: bold;
-    margin-top: 15px;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    font-weight: 800;
     cursor: pointer;
 }
+button:disabled { background: #cbd5e0 !important; cursor: not-allowed; }
