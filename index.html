@@ -3,35 +3,77 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PaDesk - Office Combo Shop</title>
+    <title>PaDesk - Direct Office Combos</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
-    <header>
-        <div><strong>PaDesk</strong> | Custom Office Combos</div>
+
+    <!-- Top App Bar -->
+    <header class="app-header">
+        <div class="brand">
+            <span class="brand-logo">📦</span>
+            <div>
+                <h1>PaDesk</h1>
+                <small>Office Gate Delivery</small>
+            </div>
+        </div>
     </header>
 
+    <!-- Ticker -->
     <div class="delivery-ticker">
-        🚛 Gate Delivery: Tuesdays & Thursdays | Min Combo: 3 Items & K249 Total
+        🚛 Delivery: Tuesdays & Thursdays | Min Combo: 3 Items & K249 Total
     </div>
 
-    <main>
-        <h2>📦 Build Your Custom Combo</h2>
+    <!-- Main Banner Carousel Area -->
+    <section class="banner-section">
+        <div id="banner-carousel" class="banner-carousel">
+            <!-- Dynamic Banners Load Here -->
+        </div>
+    </section>
+
+    <!-- Dynamic Category & Brand Filter Bar -->
+    <section class="filter-section">
+        <div class="filter-group">
+            <label>Category</label>
+            <select id="filter-category" onchange="handleCategoryChange()">
+                <option value="ALL">All Categories</option>
+            </select>
+        </div>
+
+        <div class="filter-group">
+            <label>Sub-Category</label>
+            <select id="filter-subcategory" onchange="applyFilters()">
+                <option value="ALL">All Sub-Categories</option>
+            </select>
+        </div>
+
+        <div class="filter-group">
+            <label>Brand</label>
+            <select id="filter-brand" onchange="applyFilters()">
+                <option value="ALL">All Brands</option>
+            </select>
+        </div>
+    </section>
+
+    <!-- Product Grid -->
+    <main class="content-container">
+        <h3 class="section-title">Build Your Custom Combo</h3>
         <div id="product-list" class="product-grid">Loading products...</div>
     </main>
 
+    <!-- Sticky Bottom Cart Sheet -->
     <section id="cart-section" class="cart-card">
         <h3>🛒 Your Combo Selection</h3>
         <ul id="cart-items"></ul>
         
         <div class="combo-tracker">
-            <p id="item-count-rule">❌ Items selected: 0 / 3 minimum</p>
-            <p id="price-rule">❌ Combo total: K 0.00 / K 249.00 minimum</p>
+            <div id="item-count-rule" class="rule-badge">❌ Items: 0 / 3 min</div>
+            <div id="price-rule" class="rule-badge">❌ Total: K 0.00 / K 249.00 min</div>
         </div>
 
         <form id="checkout-form" onsubmit="handleCheckout(event)">
-            <label for="workplace-select">Select Delivery Point:</label>
+            <label for="workplace-select">Select Office Delivery Point:</label>
             <select id="workplace-select" required>
                 <option value="">-- Choose your office --</option>
                 <option value="New Government Complex">New Government Complex (Independence Ave)</option>
@@ -39,10 +81,10 @@
                 <option value="Zanaco HQ">Zanaco HQ (Cairo Road)</option>
             </select>
 
-            <label for="customer-phone">WhatsApp Number:</label>
+            <label for="customer-phone">WhatsApp Contact Number:</label>
             <input type="tel" id="customer-phone" placeholder="e.g. 0977123456" required>
 
-            <button type="submit" id="checkout-btn" class="btn-primary" disabled>Build Min. K249 Combo to Order</button>
+            <button type="submit" id="checkout-btn" class="btn-primary" disabled>Build Min Combo (3 Items & K249) to Order</button>
         </form>
     </section>
 
