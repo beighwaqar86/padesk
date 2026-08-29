@@ -1,4 +1,3 @@
-// YOUR LIVE SUPABASE KEYS
 const SUPABASE_URL = "https://cziefuaclocpwicwjprb.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_j_MkiOlGUZOBsR8TSxIM1w_pnQ_B1xx";
 
@@ -512,7 +511,6 @@ function applyFilters() {
 
     let filtered = allProducts;
 
-    // Apply Circular Shortcuts Hierarchy
     if (selectedBusiness !== 'ALL') {
         filtered = filtered.filter(p => p.business === selectedBusiness);
     }
@@ -527,12 +525,10 @@ function applyFilters() {
         filtered = filtered.filter(p => p.sub_category === selectedSubcategory);
     }
 
-    // Apply Sidebar Filters
     if (sidebarCat !== 'ALL') filtered = filtered.filter(p => p.category === sidebarCat);
     if (sidebarSub !== 'ALL') filtered = filtered.filter(p => p.sub_category === sidebarSub);
     if (sidebarBrand !== 'ALL') filtered = filtered.filter(p => p.brand === sidebarBrand);
 
-    // Apply Search Input
     if (searchQuery !== "") {
         filtered = filtered.filter(p => 
             (p.name && p.name.toLowerCase().includes(searchQuery)) ||
@@ -646,26 +642,68 @@ function updateCartUI() {
     }
 }
 
-// 13. CHECKOUT WITH IMPLICIT CUSTOMER PROFILE UPSERT
-async function handleCheckout(event) {
+// 13. CHECKOUT PREVIEW MODAL FLOW
+function handleCheckout(event) {
     event.preventDefault();
-    
+
+    const items = Object.values(cart);
+    const totalCount = items.reduce((sum, item) => sum + item.qty, 0);
+    const totalPrice = items.reduce((sum, item) => {
+        const p = item.product.deal_price ? item.product.deal_price : item.product.price;
+        return sum + (parseFloat(p) * item.qty);
+    }, 0);
+
+    if (totalCount < 3 || totalPrice < 249.00) {
+        updateCartUI();
+        return alert("Combo criteria not met!");
+    }
+
+    const contactPhone = document.getElementById("customer-phone").value.trim();
+    const cTitle = document.getElementById("customer-title").value;
+    const cFirstName = document.getElementById("customer-first-name").value.trim();
+    const cLastName = document.getElementById("customer-last-name").value.trim();
+    const selectedOffice = document.getElementById("workplace-select").value;
+
+    document.getElementById("preview-customer-details").innerHTML = `
+        <strong>${cTitle} ${cFirstName} ${cLastName}</strong><br>
+        <small>📱 Phone: ${contactPhone}</small><br>
+        <small>📍 Delivery Point: <strong>${selectedOffice}</strong></small>
+    `;
+
+    document.getElementById("preview-items-list").innerHTML = items.map(item => {
+        const effectivePrice = item.product.deal_price ? item.product.deal_price : item.product.price;
+        return `
+            <div style="display: flex; justify-content: space-between; font-size: 0.82rem; margin-bottom: 6px;">
+                <span>${item.qty}x ${item.product.name}</span>
+                <strong>K ${(parseFloat(effectivePrice) * item.qty).toFixed(2)}</strong>
+            </div>
+        `;
+    }).join('');
+
+    document.getElementById("preview-total-amount").innerText = `K ${totalPrice.toFixed(2)}`;
+
+    document.getElementById("order-preview-modal").style.display = "flex";
+    document.getElementById("order-preview-overlay").style.display = "block";
+}
+
+function closeOrderPreview() {
+    document.getElementById("order-preview-modal").style.display = "none";
+    document.getElementById("order-preview-overlay").style.display = "none";
+}
+
+async function executeFinalOrderSubmission() {
+    closeOrderPreview();
+
     try {
         const btn = document.getElementById("checkout-btn");
-        btn.innerText = "⏳ Processing Order...";
+        btn.innerText = "⏳ Submitting Order...";
         btn.disabled = true;
 
         const items = Object.values(cart);
-        const totalCount = items.reduce((sum, item) => sum + item.qty, 0);
         const totalPrice = items.reduce((sum, item) => {
             const p = item.product.deal_price ? item.product.deal_price : item.product.price;
             return sum + (parseFloat(p) * item.qty);
         }, 0);
-
-        if (totalCount < 3 || totalPrice < 249.00) {
-            updateCartUI();
-            return alert("Combo criteria not met!");
-        }
 
         const contactPhone = document.getElementById("customer-phone").value.trim();
         const cTitle = document.getElementById("customer-title").value;
@@ -682,9 +720,7 @@ async function handleCheckout(event) {
             last_order_at: new Date().toISOString()
         }], { onConflict: 'phone_number' });
 
-        if (custError) {
-            throw new Error("Supabase Customers Table Error: " + custError.message);
-        }
+        if (custError) throw new Error("Customers Table Error: " + custError.message);
 
         const { error: orderError } = await db.from('orders').insert([{
             customer_phone: contactPhone,
@@ -694,9 +730,7 @@ async function handleCheckout(event) {
             status: 'Pending Aggregation'
         }]);
 
-        if (orderError) {
-            throw new Error("Supabase Orders Table Error: " + orderError.message);
-        }
+        if (orderError) throw new Error("Orders Table Error: " + orderError.message);
 
         localStorage.setItem("padesk_phone", contactPhone);
         localStorage.setItem("padesk_title", cTitle);
