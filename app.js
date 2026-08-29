@@ -6,11 +6,11 @@ let db;
 let allProducts = [];
 let cart = {}; // Object format: { productId: { product, qty } }
 
-// Sub-Categories Map for Daily Needs
+// Sub-Categories Map for Daily Needs Shortcuts
 const dailyNeedsSubMap = [
     { name: 'All Daily', icon: '🧺', value: 'ALL' },
     { name: 'Grocery', icon: '🌾', value: 'Maize Meal' },
-    { name: 'Household Essentials', icon: '🧹', value: 'Dishwashing Soap' },
+    { name: 'Household', icon: '🧹', value: 'Dishwashing Soap' },
     { name: 'Personal Care', icon: '🧴', value: 'Personal Care' },
     { name: 'Baby Care', icon: '🍼', value: 'Baby Care' }
 ];
@@ -21,6 +21,24 @@ window.onload = function() {
     loadProducts();
 };
 
+// 1. SIDEBAR TOGGLE
+function toggleSidebar() {
+    const sidebar = document.getElementById("filter-sidebar");
+    const overlay = document.getElementById("filter-sidebar-overlay");
+    
+    if (sidebar && overlay) {
+        const isOpen = sidebar.classList.contains("open");
+        if (isOpen) {
+            sidebar.classList.remove("open");
+            overlay.style.display = "none";
+        } else {
+            sidebar.classList.add("open");
+            overlay.style.display = "block";
+        }
+    }
+}
+
+// 2. FETCH DATA FROM SUPABASE
 async function loadBanners() {
     const { data: banners } = await db.from('banners').select('*').eq('is_active', true);
     if (!banners || banners.length === 0) return;
@@ -50,6 +68,7 @@ async function loadProducts() {
     renderProducts(allProducts);
 }
 
+// 3. DROPDOWN FILTERS LOGIC
 function populateFilterDropdowns() {
     const categories = ['ALL', ...new Set(allProducts.map(p => p.category).filter(Boolean))];
     const categorySelect = document.getElementById("filter-category");
@@ -83,7 +102,7 @@ function handleCategoryChange() {
     applyFilters();
 }
 
-// UNIVERSAL FILTER + SEARCH ENGINE
+// 4. UNIVERSAL FILTER ENGINE
 function applyFilters() {
     const cat = document.getElementById("filter-category")?.value || 'ALL';
     const sub = document.getElementById("filter-subcategory")?.value || 'ALL';
@@ -92,12 +111,10 @@ function applyFilters() {
 
     let filtered = allProducts;
 
-    // Apply Dropdown Filters
     if (cat !== 'ALL') filtered = filtered.filter(p => p.category === cat);
     if (sub !== 'ALL') filtered = filtered.filter(p => p.sub_category === sub);
     if (brand !== 'ALL') filtered = filtered.filter(p => p.brand === brand);
 
-    // Apply Multi-Field Text Search
     if (searchQuery !== "") {
         filtered = filtered.filter(p => 
             (p.name && p.name.toLowerCase().includes(searchQuery)) ||
@@ -133,9 +150,8 @@ function renderProducts(products) {
     `).join('');
 }
 
-// CIRCULAR SHORTCUT HANDLERS
+// 5. CIRCLE SHORTCUTS HANDLERS
 function selectCircleCategory(catName, element) {
-    // 1. Update visual active state on category circles
     document.querySelectorAll('#category-circles .circle-item').forEach(el => el.classList.remove('active'));
     if (element) element.classList.add('active');
 
@@ -150,7 +166,6 @@ function selectCircleCategory(catName, element) {
         if (subContainer) subContainer.style.display = 'none';
     } 
     else if (catName === 'Daily Needs') {
-        // Expand sub-category circles
         if (subContainer) {
             subContainer.style.display = 'flex';
             subContainer.innerHTML = dailyNeedsSubMap.map((sub, index) => `
@@ -164,7 +179,6 @@ function selectCircleCategory(catName, element) {
         applyFilters();
     } 
     else {
-        // For Beauty, Electronics, Deals - search directly
         if (subContainer) subContainer.style.display = 'none';
         if (searchInput) {
             searchInput.value = catName;
@@ -174,7 +188,6 @@ function selectCircleCategory(catName, element) {
 }
 
 function selectCircleSubcategory(subValue, element) {
-    // 1. Update active state on subcategory circles
     document.querySelectorAll('#subcategory-circles .circle-item').forEach(el => el.classList.remove('active'));
     if (element) element.classList.add('active');
 
@@ -188,7 +201,7 @@ function selectCircleSubcategory(subValue, element) {
     applyFilters();
 }
 
-// QUANTITY-BASED BASKET LOGIC
+// 6. QUANTITY BASKET LOGIC
 function addToCart(product) {
     if (cart[product.id]) {
         cart[product.id].qty += 1;
@@ -283,20 +296,4 @@ async function handleCheckout(event) {
         cart = {};
         updateCartUI();
     }
-    function toggleSidebar() {
-    const sidebar = document.getElementById("filter-sidebar");
-    const overlay = document.getElementById("filter-sidebar-overlay");
-    
-    if (sidebar && overlay) {
-        const isOpen = sidebar.classList.contains("open");
-        if (isOpen) {
-            sidebar.classList.remove("open");
-            overlay.style.display = "none";
-        } else {
-            sidebar.classList.add("open");
-            overlay.style.display = "block";
-        }
-    }
-}
-}
 }
