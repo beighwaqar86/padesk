@@ -9,7 +9,7 @@
 </head>
 <body>
 
-    <!-- Top App Bar -->
+    <!-- Top App Header -->
     <header class="app-header">
         <div class="brand">
             <span class="brand-logo">📦</span>
@@ -18,7 +18,16 @@
                 <small>Office Gate Delivery</small>
             </div>
         </div>
+        <button type="button" id="account-btn" class="btn-account" onclick="toggleAccountDrawer()">
+            👤 Account
+        </button>
     </header>
+
+    <!-- Top Welcome Bar for Recognized Shoppers -->
+    <div id="welcome-bar" class="welcome-bar" style="display: none;">
+        <span>Welcome back, <strong id="welcome-name">Shopper</strong>! 👋</span>
+        <button type="button" onclick="signOut()" class="btn-link-signout">Sign Out</button>
+    </div>
 
     <!-- Delivery Day Ticker -->
     <div class="delivery-ticker">
@@ -30,20 +39,13 @@
         <div id="banner-carousel" class="banner-carousel">
             <!-- Dynamic Banner Cards Load Here -->
         </div>
-        <div id="slider-dots" class="slider-dots">
-            <!-- Dynamic Pagination Dots Render Here -->
-        </div>
+        <div id="slider-dots" class="slider-dots"></div>
     </section>
 
     <!-- Primary Category Circle Shortcuts -->
     <div class="circle-shortcuts-wrapper">
         <div class="circle-shortcuts-container" id="category-circles">
             <!-- Dynamic Category Circles Render Here -->
-        </div>
-
-        <!-- Sub-Category Shortcuts -->
-        <div class="circle-shortcuts-container sub-circles" id="subcategory-circles" style="display: none;">
-            <!-- Dynamic Sub-category Circles Render Here -->
         </div>
     </div>
 
@@ -66,6 +68,14 @@
         <div id="product-list" class="product-grid">Loading products...</div>
     </main>
 
+    <!-- Past Purchases Slider (Hints for Fast Reorder) -->
+    <section id="past-purchases-section" class="past-purchases-section" style="display: none;">
+        <h3 class="section-title">⚡ Reorder From Past Purchases</h3>
+        <div id="past-purchases-slider" class="past-purchases-slider">
+            <!-- Past Purchased Items Load Here -->
+        </div>
+    </section>
+
     <!-- Sticky Bottom Cart Sheet -->
     <section id="cart-section" class="cart-card">
         <h3>🛒 Your Combo Selection</h3>
@@ -77,50 +87,42 @@
         </div>
 
         <form id="checkout-form" onsubmit="handleCheckout(event)">
-    <!-- 1. Phone Number Entry (Triggers lookup on input) -->
-    <label for="customer-phone">WhatsApp Contact Number:</label>
-    <input 
-        type="tel" 
-        id="customer-phone" 
-        placeholder="e.g. 0977123456" 
-        oninput="checkReturningCustomer(this.value)" 
-        required
-    >
+            <label for="customer-phone">WhatsApp Contact Number:</label>
+            <input 
+                type="tel" 
+                id="customer-phone" 
+                placeholder="e.g. 0977123456" 
+                oninput="checkReturningCustomer(this.value)" 
+                required
+            >
 
-    <!-- 2. Full Name (Auto-fills if phone exists, editable if new) -->
-    <label for="customer-name">Full Name:</label>
-    <input 
-        type="text" 
-        id="customer-name" 
-        placeholder="e.g. Mutale Phiri" 
-        required
-    >
+            <label for="customer-name">Full Name:</label>
+            <input 
+                type="text" 
+                id="customer-name" 
+                placeholder="e.g. Mutale Phiri" 
+                required
+            >
 
-    <!-- 3. Workplace Select (Auto-selects last location) -->
-    <label for="workplace-select">Select Office Delivery Point:</label>
-    <select id="workplace-select" required>
-        <option value="">-- Choose your office --</option>
-        <option value="New Government Complex">New Government Complex (Independence Ave)</option>
-        <option value="Ministry of Finance">Ministry of Finance (Haile Selassie Ave)</option>
-        <option value="Zanaco HQ">Zanaco HQ (Cairo Road)</option>
-    </select>
+            <label for="workplace-select">Select Office Delivery Point:</label>
+            <select id="workplace-select" required>
+                <option value="">-- Choose your office --</option>
+                <option value="New Government Complex">New Government Complex (Independence Ave)</option>
+                <option value="Ministry of Finance">Ministry of Finance (Haile Selassie Ave)</option>
+                <option value="Zanaco HQ">Zanaco HQ (Cairo Road)</option>
+            </select>
 
-    <button type="submit" id="checkout-btn" class="btn-primary" disabled>
-        Build Min Combo (3 Items & K249) to Order
-    </button>
-</form>
+            <button type="submit" id="checkout-btn" class="btn-primary" disabled>Build Min Combo (3 Items & K249) to Order</button>
+        </form>
     </section>
 
-    <!-- Sliding Sidebar Overlay -->
+    <!-- Sidebar Filter Drawer & Overlay -->
     <div id="filter-sidebar-overlay" class="sidebar-overlay" onclick="toggleSidebar()"></div>
-
-    <!-- Off-Canvas Filter Drawer -->
     <aside id="filter-sidebar" class="filter-sidebar">
         <div class="sidebar-header">
             <h3>Filter Products</h3>
             <button type="button" class="btn-close-sidebar" onclick="toggleSidebar()">✕</button>
         </div>
-
         <div class="sidebar-content">
             <div class="filter-group">
                 <label>Category</label>
@@ -128,23 +130,43 @@
                     <option value="ALL">All Categories</option>
                 </select>
             </div>
-
             <div class="filter-group">
                 <label>Sub-Category</label>
                 <select id="filter-subcategory" onchange="applyFilters()">
                     <option value="ALL">All Sub-Categories</option>
                 </select>
             </div>
-
             <div class="filter-group">
                 <label>Brand</label>
                 <select id="filter-brand" onchange="applyFilters()">
                     <option value="ALL">All Brands</option>
                 </select>
             </div>
-
             <button type="button" class="btn-primary" onclick="toggleSidebar()" style="margin-top: 20px;">
                 Apply Filters
+            </button>
+        </div>
+    </aside>
+
+    <!-- Account Details Drawer & Overlay -->
+    <div id="account-drawer-overlay" class="sidebar-overlay" onclick="toggleAccountDrawer()"></div>
+    <aside id="account-drawer" class="filter-sidebar">
+        <div class="sidebar-header">
+            <h3>My Account Profile</h3>
+            <button type="button" class="btn-close-sidebar" onclick="toggleAccountDrawer()">✕</button>
+        </div>
+        <div class="sidebar-content">
+            <div id="account-profile-info" class="account-profile-box">
+                <!-- Account Profile Details Load Here -->
+            </div>
+
+            <h4 style="margin: 16px 0 8px;">Order History</h4>
+            <div id="account-order-history" class="order-history-list">
+                <p><small>Sign in by placing an order or entering your phone number.</small></p>
+            </div>
+
+            <button type="button" id="drawer-signout-btn" class="btn-danger" onclick="signOut()" style="display:none; margin-top: 20px;">
+                Sign Out
             </button>
         </div>
     </aside>
