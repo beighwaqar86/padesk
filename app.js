@@ -15,59 +15,96 @@ window.onload = function() {
     autoPopulateSavedCustomer();
 };
 
-// 1. AUTO-POPULATE & WELCOME BAR FOR RETURNING SHOPPERS
+// 1. AUTO-POPULATE & STATE BAR ENGINE (WELCOME VS QUICK-LOGIN)
 function autoPopulateSavedCustomer() {
     const savedPhone = localStorage.getItem("padesk_phone");
     const savedName = localStorage.getItem("padesk_name");
     const savedOffice = localStorage.getItem("padesk_office");
 
-    const welcomeBar = document.getElementById("welcome-bar");
-    const welcomeName = document.getElementById("welcome-name");
+    const stateBar = document.getElementById("user-state-bar");
 
-    if (savedPhone) {
-        const phoneEl = document.getElementById("customer-phone");
-        if (phoneEl) phoneEl.value = savedPhone;
-
-        if (welcomeBar && welcomeName && savedName) {
-            welcomeName.innerText = savedName;
-            welcomeBar.style.display = "flex";
+    if (savedPhone && savedName) {
+        // Known User: Render Welcome Back Bar
+        if (stateBar) {
+            stateBar.style.display = "flex";
+            stateBar.innerHTML = `
+                <span>Welcome back, <strong>${savedName}</strong>! 👋</span>
+                <button type="button" onclick="signOut()" class="btn-link-signout">Sign Out</button>
+            `;
         }
 
-        loadPastPurchases(savedPhone);
-        loadAccountHistory(savedPhone);
-    } else if (welcomeBar) {
-        welcomeBar.style.display = "none";
-    }
-
-    if (savedName) {
+        const phoneEl = document.getElementById("customer-phone");
         const nameEl = document.getElementById("customer-name");
-        if (nameEl) nameEl.value = savedName;
-    }
-    if (savedOffice) {
         const officeEl = document.getElementById("workplace-select");
-        if (officeEl) officeEl.value = savedOffice;
+
+        if (phoneEl) phoneEl.value = savedPhone;
+        if (nameEl) nameEl.value = savedName;
+        if (officeEl && savedOffice) officeEl.value = savedOffice;
+
+        loadPastPurchases(savedPhone);
+    } else {
+        // Guest User: Render Optional Quick-Login Bar
+        if (stateBar) {
+            stateBar.style.display = "flex";
+            stateBar.innerHTML = `
+                <span>Already ordered before?</span>
+                <div class="quick-login-input-wrap">
+                    <input type="tel" id="quick-phone" placeholder="Enter Phone" oninput="checkReturningCustomer(this.value)">
+                </div>
+            `;
+        }
+        
+        // Reset Drawer UI if open
+        resetAccountDrawerUI();
     }
 }
 
-// 2. SIGN-OUT FUNCTION
+// 2. COMPLETE SIGN-OUT FIX (CLEARS BOTH LOCALSTORAGE AND DRAWER DOM)
 function signOut() {
     localStorage.removeItem("padesk_phone");
     localStorage.removeItem("padesk_name");
     localStorage.removeItem("padesk_office");
 
-    document.getElementById("customer-phone").value = "";
-    document.getElementById("customer-name").value = "";
-    document.getElementById("workplace-select").value = "";
+    const phoneEl = document.getElementById("customer-phone");
+    const nameEl = document.getElementById("customer-name");
+    const officeEl = document.getElementById("workplace-select");
 
-    document.getElementById("welcome-bar").style.display = "none";
-    document.getElementById("past-purchases-section").style.display = "none";
+    if (phoneEl) phoneEl.value = "";
+    if (nameEl) nameEl.value = "";
+    if (officeEl) officeEl.value = "";
 
+    const pastSection = document.getElementById("past-purchases-section");
+    if (pastSection) pastSection.style.display = "none";
+
+    // Clear Account Drawer HTML Elements Immediately
+    resetAccountDrawerUI();
+
+    // Close drawer if open
     const accountDrawer = document.getElementById("account-drawer");
     if (accountDrawer && accountDrawer.classList.contains("open")) {
         toggleAccountDrawer();
     }
 
-    alert("You have been signed out.");
+    autoPopulateSavedCustomer();
+}
+
+function resetAccountDrawerUI() {
+    const profileBox = document.getElementById("account-profile-info");
+    const historyList = document.getElementById("account-order-history");
+    const signOutBtn = document.getElementById("drawer-signout-btn");
+
+    if (profileBox) {
+        profileBox.innerHTML = `
+            <p style="margin:0;"><small>You are currently browsing as a <strong>Guest</strong>.</small></p>
+            <small style="color:#718096;">Enter your mobile number at checkout or in the top bar to load your account profile.</small>
+        `;
+    }
+    if (historyList) {
+        historyList.innerHTML = "<p><small>No active session found.</small></p>";
+    }
+    if (signOutBtn) {
+        signOutBtn.style.display = "none";
+    }
 }
 
 // 3. DYNAMIC CUSTOMER LOOKUP ON PHONE INPUT
@@ -84,23 +121,17 @@ async function checkReturningCustomer(phone) {
     if (customer) {
         const nameEl = document.getElementById("customer-name");
         const officeEl = document.getElementById("workplace-select");
+        const phoneEl = document.getElementById("customer-phone");
 
         if (nameEl) nameEl.value = customer.full_name;
         if (officeEl) officeEl.value = customer.default_office;
+        if (phoneEl) phoneEl.value = customer.phone_number;
 
         localStorage.setItem("padesk_phone", customer.phone_number);
         localStorage.setItem("padesk_name", customer.full_name);
         localStorage.setItem("padesk_office", customer.default_office);
 
-        const welcomeBar = document.getElementById("welcome-bar");
-        const welcomeName = document.getElementById("welcome-name");
-        if (welcomeBar && welcomeName) {
-            welcomeName.innerText = customer.full_name;
-            welcomeBar.style.display = "flex";
-        }
-
-        loadPastPurchases(cleanPhone);
-        loadAccountHistory(cleanPhone);
+        autoPopulateSavedCustomer();
     }
 }
 
@@ -151,8 +182,12 @@ function toggleAccountDrawer() {
         overlay.style.display = isOpen ? "none" : "block";
 
         const savedPhone = localStorage.getItem("padesk_phone");
-        if (!isOpen && savedPhone) {
-            loadAccountHistory(savedPhone);
+        if (!isOpen) {
+            if (savedPhone) {
+                loadAccountHistory(savedPhone);
+            } else {
+                resetAccountDrawerUI();
+            }
         }
     }
 }
@@ -474,7 +509,6 @@ async function handleCheckout(event) {
     const customerName = document.getElementById("customer-name").value.trim();
     const selectedOffice = document.getElementById("workplace-select").value;
 
-    // A. Upsert Customer Master Profile
     const { error: custError } = await db.from('customers').upsert([{
         phone_number: contactPhone,
         full_name: customerName,
@@ -486,7 +520,6 @@ async function handleCheckout(event) {
         console.error("Customer record creation error:", custError.message);
     }
 
-    // B. Create Order Record
     const { error: orderError } = await db.from('orders').insert([{
         customer_phone: contactPhone,
         delivery_location: selectedOffice,
@@ -502,7 +535,6 @@ async function handleCheckout(event) {
         localStorage.setItem("padesk_name", customerName);
         localStorage.setItem("padesk_office", selectedOffice);
 
-        alert(`Zikomo ${customerName}! Your combo order has been submitted successfully.`);
         cart = {};
         updateCartUI();
         autoPopulateSavedCustomer();
