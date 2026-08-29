@@ -25,10 +25,13 @@
         🚛 Delivery: Tuesdays & Thursdays | Min Combo: 3 Items & K249 Total
     </div>
 
-    <!-- Main Auto-Scrolling Banner Marquee Area -->
+    <!-- Interactive Hero Banner Slider Area -->
     <section class="banner-section">
         <div id="banner-carousel" class="banner-carousel">
-            <!-- Dynamic Marquee Banners Load Here -->
+            <!-- Dynamic Banner Cards Load Here -->
+        </div>
+        <div id="slider-dots" class="slider-dots">
+            <!-- Dynamic Pagination Dots Render Here -->
         </div>
     </section>
 
@@ -44,7 +47,7 @@
         </div>
     </div>
 
-    <!-- Single Search & Sidebar Trigger Bar -->
+    <!-- Search Bar & Sidebar Filter Toggle Bar -->
     <div class="search-filter-bar">
         <input 
             type="text" 
@@ -86,50 +89,6 @@
             <input type="tel" id="customer-phone" placeholder="e.g. 0977123456" required>
 
             <button type="submit" id="checkout-btn" class="btn-primary" disabled>Build Min Combo (3 Items & K249) to Order</button>
-        </form>
-    </section>
-
-    <!-- Sliding Sidebar Overlay -->
-    <div id="filter-sidebar-overlay" class="sidebar-overlay" onclick="toggleSidebar()"></div>
-
-    <!-- Off-Canvas Filter Drawer -->
-    <aside id="filter-sidebar" class="filter-sidebar">
-        <div class="sidebar-header">
-            <h3>Filter Products</h3>
-            <button type="button" class="btn-close-sidebar" onclick="toggleSidebar()">✕</button>
-        </div>
-
-        <div class="sidebar-content">
-            <div class="filter-group">
-                <label>Category</label>
-                <select id="filter-category" onchange="handleCategoryChange()">
-                    <option value="ALL">All Categories</option>
-                </select>
-            </div>
-
-            <div class="filter-group">
-                <label>Sub-Category</label>
-                <select id="filter-subcategory" onchange="applyFilters()">
-                    <option value="ALL">All Sub-Categories</option>
-                </select>
-            </div>
-
-            <div class="filter-group">
-                <label>Brand</label>
-                <select id="filter-brand" onchange="applyFilters()">
-                    <option value="ALL">All Brands</option>
-                </select>
-            </div>
-
-            <button type="button" class="btn-primary" onclick="toggleSidebar()" style="margin-top: 20px;">
-                Apply Filters
-            </button>
-        </div>
-    </aside>
-
-    <script src="app.js"></script>
-</body>
-</html>
         </form>
     </section>
 
