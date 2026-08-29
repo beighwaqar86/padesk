@@ -4,7 +4,7 @@ const SUPABASE_ANON_KEY = "sb_publishable_j_MkiOlGUZOBsR8TSxIM1w_pnQ_B1xx";
 
 let db;
 let allProducts = [];
-let cart = [];
+let cart = {}; // Object format: { productId: { product, qty } }
 
 window.onload = function() {
     db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -17,14 +17,16 @@ async function loadBanners() {
     if (!banners || banners.length === 0) return;
 
     const container = document.getElementById("banner-carousel");
-    container.innerHTML = banners.map(b => `
-        <div class="banner-card" style="background-image: url('${b.image_url}');">
-            <div class="banner-overlay">
-                <h4>${b.title || ''}</h4>
-                <p>${b.subtitle || ''}</p>
+    if (container) {
+        container.innerHTML = banners.map(b => `
+            <div class="banner-card" style="background-image: url('${b.image_url}');">
+                <div class="banner-overlay">
+                    <h4>${b.title || ''}</h4>
+                    <p>${b.subtitle || ''}</p>
+                </div>
             </div>
-        </div>
-    `).join('');
+        `).join('');
+    }
 }
 
 async function loadProducts() {
@@ -65,15 +67,30 @@ function handleCategoryChange() {
     applyFilters();
 }
 
+// UNIVERSAL FILTER + SEARCH ENGINE
 function applyFilters() {
     const cat = document.getElementById("filter-category").value;
     const sub = document.getElementById("filter-subcategory").value;
     const brand = document.getElementById("filter-brand").value;
+    const searchQuery = (document.getElementById("search-input")?.value || "").toLowerCase().trim();
 
     let filtered = allProducts;
+
+    // Apply Dropdown Filters
     if (cat !== 'ALL') filtered = filtered.filter(p => p.category === cat);
     if (sub !== 'ALL') filtered = filtered.filter(p => p.sub_category === sub);
     if (brand !== 'ALL') filtered = filtered.filter(p => p.brand === brand);
+
+    // Apply Multi-Field Text Search
+    if (searchQuery !== "") {
+        filtered = filtered.filter(p => 
+            (p.name && p.name.toLowerCase().includes(searchQuery)) ||
+            (p.category && p.category.toLowerCase().includes(searchQuery)) ||
+            (p.sub_category && p.sub_category.toLowerCase().includes(searchQuery)) ||
+            (p.brand && p.brand.toLowerCase().includes(searchQuery)) ||
+            (p.description && p.description.toLowerCase().includes(searchQuery))
+        );
+    }
 
     renderProducts(filtered);
 }
@@ -81,7 +98,7 @@ function applyFilters() {
 function renderProducts(products) {
     const container = document.getElementById("product-list");
     if (products.length === 0) {
-        container.innerHTML = "<p><small>No items match these filters.</small></p>";
+        container.innerHTML = "<p><small>No items match your search or filter.</small></p>";
         return;
     }
 
@@ -100,27 +117,47 @@ function renderProducts(products) {
     `).join('');
 }
 
+// QUANTITY-BASED BASKET LOGIC
 function addToCart(product) {
-    cart.push(product);
+    if (cart[product.id]) {
+        cart[product.id].qty += 1;
+    } else {
+        cart[product.id] = { product: product, qty: 1 };
+    }
     updateCartUI();
 }
 
-function removeFromCart(index) {
-    cart.splice(index, 1);
+function updateQuantity(productId, change) {
+    if (cart[productId]) {
+        cart[productId].qty += change;
+        if (cart[productId].qty <= 0) {
+            delete cart[productId];
+        }
+    }
     updateCartUI();
 }
 
 function updateCartUI() {
     const list = document.getElementById("cart-items");
-    list.innerHTML = cart.map((item, index) => `
-        <li style="font-size: 0.85rem; margin-bottom: 4px;">
-            ${item.name} - <strong>K ${parseFloat(item.price).toFixed(2)}</strong>
-            <button onclick="removeFromCart(${index})" style="color:red; background:none; border:none; cursor:pointer;">✕</button>
+    const items = Object.values(cart);
+
+    list.innerHTML = items.map(item => `
+        <li style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 0.85rem;">
+            <div>
+                <strong>${item.product.name}</strong><br>
+                <small>K ${parseFloat(item.product.price).toFixed(2)} x ${item.qty} = <strong>K ${(parseFloat(item.product.price) * item.qty).toFixed(2)}</strong></small>
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px;">
+                <button onclick="updateQuantity(${item.product.id}, -1)" style="background: #edf2f7; border: 1px solid #cbd5e0; border-radius: 4px; padding: 2px 8px; font-weight: bold; cursor: pointer;">-</button>
+                <span style="font-weight: bold;">${item.qty}</span>
+                <button onclick="updateQuantity(${item.product.id}, 1)" style="background: #0baf65; color: white; border: none; border-radius: 4px; padding: 2px 8px; font-weight: bold; cursor: pointer;">+</button>
+            </div>
         </li>
     `).join('');
     
-    const totalCount = cart.length;
-    const totalPrice = cart.reduce((sum, item) => sum + parseFloat(item.price), 0);
+    // Calculate total distinct item units and total price
+    const totalCount = items.reduce((sum, item) => sum + item.qty, 0);
+    const totalPrice = items.reduce((sum, item) => sum + (parseFloat(item.product.price) * item.qty), 0);
 
     const countRuleEl = document.getElementById("item-count-rule");
     const priceRuleEl = document.getElementById("price-rule");
@@ -129,7 +166,7 @@ function updateCartUI() {
     const hasMinItems = totalCount >= 3;
     const hasMinPrice = totalPrice >= 249.00;
 
-    countRuleEl.innerHTML = hasMinItems ? `✅ Items: ${totalCount} (Minimum Met)` : `❌ Items: ${totalCount} / 3 min`;
+    countRuleEl.innerHTML = hasMinItems ? `✅ Total Items: ${totalCount} (Minimum Met)` : `❌ Total Items: ${totalCount} / 3 min`;
     countRuleEl.style.color = hasMinItems ? "#088a4f" : "#e53e3e";
 
     priceRuleEl.innerHTML = hasMinPrice ? `✅ Total: K ${totalPrice.toFixed(2)} (Minimum Met)` : `❌ Total: K ${totalPrice.toFixed(2)} / K 249.00 min`;
@@ -146,8 +183,11 @@ function updateCartUI() {
 
 async function handleCheckout(event) {
     event.preventDefault();
-    const totalPrice = cart.reduce((sum, item) => sum + parseFloat(item.price), 0);
-    if (cart.length < 3 || totalPrice < 249.00) return alert("Combo criteria not met!");
+    const items = Object.values(cart);
+    const totalCount = items.reduce((sum, item) => sum + item.qty, 0);
+    const totalPrice = items.reduce((sum, item) => sum + (parseFloat(item.product.price) * item.qty), 0);
+
+    if (totalCount < 3 || totalPrice < 249.00) return alert("Combo criteria not met!");
 
     const selectedOffice = document.getElementById("workplace-select").value;
     const contactPhone = document.getElementById("customer-phone").value;
@@ -156,7 +196,7 @@ async function handleCheckout(event) {
         customer_phone: contactPhone,
         delivery_location: selectedOffice,
         total_amount: totalPrice,
-        order_items_json: cart,
+        order_items_json: items, // Contains formatted quantity array
         status: 'Pending Aggregation'
     }]);
 
@@ -164,7 +204,7 @@ async function handleCheckout(event) {
         alert("Error: " + error.message);
     } else {
         alert("Zikomo! Combo order submitted successfully.");
-        cart = [];
+        cart = {};
         updateCartUI();
     }
 }
