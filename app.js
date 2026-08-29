@@ -1,4 +1,3 @@
-// YOUR LIVE SUPABASE KEYS
 const SUPABASE_URL = "https://cziefuaclocpwicwjprb.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_j_MkiOlGUZOBsR8TSxIM1w_pnQ_B1xx";
 
@@ -15,7 +14,6 @@ window.onload = function() {
     autoPopulateSavedCustomer();
 };
 
-// 1. AUTO-POPULATE & STATE BAR ENGINE
 function autoPopulateSavedCustomer() {
     const savedPhone = localStorage.getItem("padesk_phone");
     const savedTitle = localStorage.getItem("padesk_title") || "";
@@ -57,7 +55,6 @@ function autoPopulateSavedCustomer() {
     }
 }
 
-// 2. SIGN-OUT FUNCTION
 function signOut() {
     localStorage.removeItem("padesk_phone");
     localStorage.removeItem("padesk_title");
@@ -104,7 +101,6 @@ function resetAccountDrawerUI() {
     }
 }
 
-// 3. QUICK LOGIN TRIGGER
 async function triggerQuickLogin() {
     const input = document.getElementById("quick-phone");
     const btn = document.getElementById("btn-quick-login");
@@ -116,7 +112,6 @@ async function triggerQuickLogin() {
     }
 }
 
-// 4. DYNAMIC CUSTOMER LOOKUP
 async function checkReturningCustomer(phone, isQuickLogin = false) {
     const cleanPhone = phone.trim();
     if (cleanPhone.length < 9) {
@@ -161,7 +156,6 @@ async function checkReturningCustomer(phone, isQuickLogin = false) {
     }
 }
 
-// 5. LOAD PAST PURCHASES SLIDER
 async function loadPastPurchases(phone) {
     const { data: orders } = await db
         .from('orders')
@@ -198,7 +192,6 @@ async function loadPastPurchases(phone) {
     }
 }
 
-// 6. ACCOUNT DETAILS DRAWER TOGGLE & HISTORY FETCH
 function toggleAccountDrawer() {
     const drawer = document.getElementById("account-drawer");
     const overlay = document.getElementById("account-drawer-overlay");
@@ -261,7 +254,6 @@ async function loadAccountHistory(phone) {
     }
 }
 
-// 7. SIDEBAR DRAWER TOGGLE LOGIC
 function toggleSidebar() {
     const sidebar = document.getElementById("filter-sidebar");
     const overlay = document.getElementById("filter-sidebar-overlay");
@@ -272,7 +264,6 @@ function toggleSidebar() {
     }
 }
 
-// 8. HERO BANNER SLIDER LOGIC
 async function loadBanners() {
     const { data: banners } = await db.from('banners').select('*').eq('is_active', true);
     if (!banners || banners.length === 0) return;
@@ -326,9 +317,9 @@ function syncDotsOnScroll(totalSlides) {
     }
 }
 
-// 9. FETCH PRODUCTS FROM DATABASE MASTER
+// 9. FETCH PRODUCTS FROM DATABASE MASTER (Mapped to lowercase 'category')
 async function loadProducts() {
-    const { data: products, error } = await db.from('products').select('*');
+    const { data: products, error } = await db.from('products').select('*').eq('is_active', true);
     if (error || !products) {
         document.getElementById("product-list").innerText = "Failed to load products.";
         return;
@@ -339,7 +330,7 @@ async function loadProducts() {
     renderProducts(allProducts);
 }
 
-// 10. BUILD FILTERS & CIRCLE SHORTCUTS
+// 10. BUILD FILTERS & CIRCLE SHORTCUTS USING LOWERCASE 'category'
 function buildDynamicMasterFilters() {
     const categories = ['ALL', ...new Set(allProducts.map(p => p.category).filter(Boolean))];
     const categorySelect = document.getElementById("filter-category");
@@ -395,7 +386,7 @@ function selectCircleCategory(catName, element) {
     }
 }
 
-// 11. UNIVERSAL SEARCH & FILTER ENGINE
+// 11. UNIVERSAL SEARCH & FILTER ENGINE (Mapped to lowercase 'category')
 function applyFilters() {
     const cat = document.getElementById("filter-category")?.value || 'ALL';
     const sub = document.getElementById("filter-subcategory")?.value || 'ALL';
@@ -451,7 +442,6 @@ function renderProducts(products) {
     }).join('');
 }
 
-// 12. QUANTITY BASKET & COMBO ENGINE
 function addToCart(product) {
     if (cart[product.id]) {
         cart[product.id].qty += 1;
@@ -521,7 +511,6 @@ function updateCartUI() {
     }
 }
 
-// 13. CHECKOUT WITH IMPLICIT CUSTOMER PROFILE UPSERT
 async function handleCheckout(event) {
     event.preventDefault();
     
