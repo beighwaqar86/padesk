@@ -19,15 +19,6 @@
             </div>
         </div>
     </header>
-<div class="search-container" style="padding: 0 16px 8px;">
-    <input 
-        type="text" 
-        id="search-input" 
-        placeholder="🔍 Search name, category, brand..." 
-        oninput="applyFilters()"
-        style="width: 100%; padding: 10px; border: 1px solid #cbd5e0; border-radius: 8px; font-size: 0.9rem; box-sizing: border-box;"
-    >
-</div>
 
     <!-- Ticker -->
     <div class="delivery-ticker">
@@ -40,86 +31,50 @@
             <!-- Dynamic Banners Load Here -->
         </div>
     </section>
-<!-- Primary Category Circle Shortcuts -->
-<div class="circle-shortcuts-wrapper">
-    <div class="circle-shortcuts-container" id="category-circles">
-        <div class="circle-item active" onclick="selectCircleCategory('ALL', this)">
-            <div class="circle-icon">🔥</div>
-            <span>All</span>
+
+    <!-- Primary Category Circle Shortcuts -->
+    <div class="circle-shortcuts-wrapper">
+        <div class="circle-shortcuts-container" id="category-circles">
+            <div class="circle-item active" onclick="selectCircleCategory('ALL', this)">
+                <div class="circle-icon">🔥</div>
+                <span>All</span>
+            </div>
+            <div class="circle-item" onclick="selectCircleCategory('Daily Needs', this)">
+                <div class="circle-icon">🛒</div>
+                <span>Daily Needs</span>
+            </div>
+            <div class="circle-item" onclick="selectCircleCategory('Beauty', this)">
+                <div class="circle-icon">✨</div>
+                <span>Beauty</span>
+            </div>
+            <div class="circle-item" onclick="selectCircleCategory('Electronics', this)">
+                <div class="circle-icon">⚡</div>
+                <span>Electronics</span>
+            </div>
+            <div class="circle-item" onclick="selectCircleCategory('Deals', this)">
+                <div class="circle-icon">🏷️</div>
+                <span>Deals</span>
+            </div>
         </div>
-        <div class="circle-item" onclick="selectCircleCategory('Daily Needs', this)">
-            <div class="circle-icon">🛒</div>
-            <span>Daily Needs</span>
-        </div>
-        <div class="circle-item" onclick="selectCircleCategory('Beauty', this)">
-            <div class="circle-icon">✨</div>
-            <span>Beauty</span>
-        </div>
-        <div class="circle-item" onclick="selectCircleCategory('Electronics', this)">
-            <div class="circle-icon">⚡</div>
-            <span>Electronics</span>
-        </div>
-        <div class="circle-item" onclick="selectCircleCategory('Deals', this)">
-            <div class="circle-icon">🏷️</div>
-            <span>Deals</span>
+
+        <!-- Sub-Category Shortcuts -->
+        <div class="circle-shortcuts-container sub-circles" id="subcategory-circles" style="display: none;">
+            <!-- Dynamic Sub-category Circles Render Here -->
         </div>
     </div>
 
-    <!-- Sub-Category Shortcuts (Appears dynamically for Daily Needs) -->
-    <div class="circle-shortcuts-container sub-circles" id="subcategory-circles" style="display: none;">
-        <!-- Dynamic Sub-category Circles Render Here -->
-    </div>
-</div>
-    <!-- Universal Search Bar & Filter Toggle Button -->
-<div class="search-filter-bar">
-    <input 
-        type="text" 
-        id="search-input" 
-        placeholder="🔍 Search name, category, brand..." 
-        oninput="applyFilters()"
-    >
-    <button class="btn-filter-toggle" onclick="toggleSidebar()">
-        ⚙️ Filters
-    </button>
-</div>
-
-<!-- Sliding Sidebar Overlay -->
-<div id="filter-sidebar-overlay" class="sidebar-overlay" onclick="toggleSidebar()"></div>
-
-<!-- Collapsible Filter Sidebar -->
-<aside id="filter-sidebar" class="filter-sidebar">
-    <div class="sidebar-header">
-        <h3>Filter Products</h3>
-        <button class="btn-close-sidebar" onclick="toggleSidebar()">✕</button>
-    </div>
-
-    <div class="sidebar-content">
-        <div class="filter-group">
-            <label>Category</label>
-            <select id="filter-category" onchange="handleCategoryChange()">
-                <option value="ALL">All Categories</option>
-            </select>
-        </div>
-
-        <div class="filter-group">
-            <label>Sub-Category</label>
-            <select id="filter-subcategory" onchange="applyFilters()">
-                <option value="ALL">All Sub-Categories</option>
-            </select>
-        </div>
-
-        <div class="filter-group">
-            <label>Brand</label>
-            <select id="filter-brand" onchange="applyFilters()">
-                <option value="ALL">All Brands</option>
-            </select>
-        </div>
-
-        <button class="btn-primary" onclick="toggleSidebar()" style="margin-top: 20px;">
-            Apply Filters
+    <!-- Single Unified Search & Filter Trigger Bar -->
+    <div class="search-filter-bar">
+        <input 
+            type="text" 
+            id="search-input" 
+            placeholder="🔍 Search name, category, brand..." 
+            oninput="applyFilters()"
+        >
+        <button type="button" class="btn-filter-toggle" onclick="toggleSidebar()">
+            ⚙️ Filters
         </button>
     </div>
-</aside>
 
     <!-- Product Grid -->
     <main class="content-container">
@@ -152,6 +107,43 @@
             <button type="submit" id="checkout-btn" class="btn-primary" disabled>Build Min Combo (3 Items & K249) to Order</button>
         </form>
     </section>
+
+    <!-- Sliding Filter Sidebar & Overlay -->
+    <div id="filter-sidebar-overlay" class="sidebar-overlay" onclick="toggleSidebar()"></div>
+
+    <aside id="filter-sidebar" class="filter-sidebar">
+        <div class="sidebar-header">
+            <h3>Filter Products</h3>
+            <button type="button" class="btn-close-sidebar" onclick="toggleSidebar()">✕</button>
+        </div>
+
+        <div class="sidebar-content">
+            <div class="filter-group">
+                <label>Category</label>
+                <select id="filter-category" onchange="handleCategoryChange()">
+                    <option value="ALL">All Categories</option>
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <label>Sub-Category</label>
+                <select id="filter-subcategory" onchange="applyFilters()">
+                    <option value="ALL">All Sub-Categories</option>
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <label>Brand</label>
+                <select id="filter-brand" onchange="applyFilters()">
+                    <option value="ALL">All Brands</option>
+                </select>
+            </div>
+
+            <button type="button" class="btn-primary" onclick="toggleSidebar()" style="margin-top: 20px;">
+                Apply Filters
+            </button>
+        </div>
+    </aside>
 
     <script src="app.js"></script>
 </body>
