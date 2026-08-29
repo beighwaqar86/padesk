@@ -439,6 +439,23 @@ body {
     font-weight: 800;
     cursor: pointer;
 }
+/* Button success animation state */
+.btn-add.success {
+    background-color: #3182ce !important; /* Changes to blue or keeps green with checkmark */
+    transform: scale(0.96);
+    transition: all 0.15s ease;
+}
+
+/* Cart bounce / pulse animation */
+@keyframes pulseCart {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+.cart-card.pulse {
+    animation: pulseCart 0.3s ease;
+}
 .btn-danger {
     background: #e53e3e;
     color: white;
