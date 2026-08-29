@@ -70,8 +70,30 @@
         <!-- Dynamic Sub-category Circles Render Here -->
     </div>
 </div>
-    <!-- Dynamic Category & Brand Filter Bar -->
-    <section class="filter-section">
+    <!-- Universal Search Bar & Filter Toggle Button -->
+<div class="search-filter-bar">
+    <input 
+        type="text" 
+        id="search-input" 
+        placeholder="🔍 Search name, category, brand..." 
+        oninput="applyFilters()"
+    >
+    <button class="btn-filter-toggle" onclick="toggleSidebar()">
+        ⚙️ Filters
+    </button>
+</div>
+
+<!-- Sliding Sidebar Overlay -->
+<div id="filter-sidebar-overlay" class="sidebar-overlay" onclick="toggleSidebar()"></div>
+
+<!-- Collapsible Filter Sidebar -->
+<aside id="filter-sidebar" class="filter-sidebar">
+    <div class="sidebar-header">
+        <h3>Filter Products</h3>
+        <button class="btn-close-sidebar" onclick="toggleSidebar()">✕</button>
+    </div>
+
+    <div class="sidebar-content">
         <div class="filter-group">
             <label>Category</label>
             <select id="filter-category" onchange="handleCategoryChange()">
@@ -92,10 +114,12 @@
                 <option value="ALL">All Brands</option>
             </select>
         </div>
-        <!-- Universal Search Bar Below Filters -->
 
-
-    </section>
+        <button class="btn-primary" onclick="toggleSidebar()" style="margin-top: 20px;">
+            Apply Filters
+        </button>
+    </div>
+</aside>
 
     <!-- Product Grid -->
     <main class="content-container">
