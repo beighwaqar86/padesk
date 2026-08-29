@@ -565,7 +565,7 @@ function renderProducts(products) {
                         K ${parseFloat(activePrice).toFixed(2)}
                         ${p.deal_price ? `<small style="text-decoration:line-through; color:#a0aec0; font-size:0.75rem;">K${parseFloat(p.price).toFixed(2)}</small>` : ''}
                     </div>
-                    <button onclick='addToCart(${JSON.stringify(p)})' class="btn-add">+ Add</button>
+                    <button onclick='addToCart(${JSON.stringify(p)}, event)' class="btn-add">+ Add</button>
                 </div>
             </div>
         `;
