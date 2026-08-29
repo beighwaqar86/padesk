@@ -40,7 +40,36 @@
             <!-- Dynamic Banners Load Here -->
         </div>
     </section>
+<!-- Primary Category Circle Shortcuts -->
+<div class="circle-shortcuts-wrapper">
+    <div class="circle-shortcuts-container" id="category-circles">
+        <div class="circle-item active" onclick="selectCircleCategory('ALL', this)">
+            <div class="circle-icon">🔥</div>
+            <span>All</span>
+        </div>
+        <div class="circle-item" onclick="selectCircleCategory('Daily Needs', this)">
+            <div class="circle-icon">🛒</div>
+            <span>Daily Needs</span>
+        </div>
+        <div class="circle-item" onclick="selectCircleCategory('Beauty', this)">
+            <div class="circle-icon">✨</div>
+            <span>Beauty</span>
+        </div>
+        <div class="circle-item" onclick="selectCircleCategory('Electronics', this)">
+            <div class="circle-icon">⚡</div>
+            <span>Electronics</span>
+        </div>
+        <div class="circle-item" onclick="selectCircleCategory('Deals', this)">
+            <div class="circle-icon">🏷️</div>
+            <span>Deals</span>
+        </div>
+    </div>
 
+    <!-- Sub-Category Shortcuts (Appears dynamically for Daily Needs) -->
+    <div class="circle-shortcuts-container sub-circles" id="subcategory-circles" style="display: none;">
+        <!-- Dynamic Sub-category Circles Render Here -->
+    </div>
+</div>
     <!-- Dynamic Category & Brand Filter Bar -->
     <section class="filter-section">
         <div class="filter-group">
