@@ -23,7 +23,7 @@
         </button>
     </header>
 
-    <!-- Top State Bar: Welcome Back (Recognized User) OR Quick-Login Prompt (Guest User) -->
+    <!-- Top State Bar: Welcome Back OR Quick-Login Prompt -->
     <div id="user-state-bar" class="user-state-bar">
         <!-- Dynamic content injected by app.js -->
     </div>
@@ -85,7 +85,7 @@
             <div id="price-rule" class="rule-badge">❌ Total: K 0.00 / K 249.00 min</div>
         </div>
 
-       <form id="checkout-form" onsubmit="handleCheckout(event)">
+        <form id="checkout-form" onsubmit="handleCheckout(event)">
             
             <div style="margin-bottom: 16px;">
                 <label for="workplace-select" style="display:block; font-weight:700; font-size:0.8rem; margin-bottom:6px; color:#4a5568;">📍 Delivery Point</label>
@@ -125,32 +125,6 @@
                 
                 <input type="text" id="customer-last-name" placeholder="Last Name" required class="form-input" style="width: 100%; padding: 10px;">
             </div>
-
-            <button type="submit" id="checkout-btn" class="btn-primary" disabled>Build Min Combo (3 Items & K249) to Order</button>
-        </form>
-
-            <!-- Replace the old Full Name input with this: -->
-            <label>Customer Name:</label>
-            <div style="display: flex; gap: 8px; margin-bottom: 12px;">
-                <select id="customer-title" required style="padding: 10px; border: 1px solid #cbd5e0; border-radius: 8px; font-size: 0.9rem; background: #f7fafc;">
-                    <option value="">Title</option>
-                    <option value="Mr.">Mr.</option>
-                    <option value="Mrs.">Mrs.</option>
-                    <option value="Ms.">Ms.</option>
-                    <option value="Dr.">Dr.</option>
-                    <option value="Prof.">Prof.</option>
-                </select>
-                <input type="text" id="customer-first-name" placeholder="First Name" required style="flex: 1; padding: 10px; border: 1px solid #cbd5e0; border-radius: 8px; font-size: 0.9rem; box-sizing: border-box;">
-                <input type="text" id="customer-last-name" placeholder="Last Name" required style="flex: 1; padding: 10px; border: 1px solid #cbd5e0; border-radius: 8px; font-size: 0.9rem; box-sizing: border-box;">
-            </div>
-
-            <label for="workplace-select">Select Office Delivery Point:</label>
-            <select id="workplace-select" required>
-                <option value="">-- Choose your office --</option>
-                <option value="New Government Complex">New Government Complex (Independence Ave)</option>
-                <option value="Ministry of Finance">Ministry of Finance (Haile Selassie Ave)</option>
-                <option value="Zanaco HQ">Zanaco HQ (Cairo Road)</option>
-            </select>
 
             <button type="submit" id="checkout-btn" class="btn-primary" disabled>Build Min Combo (3 Items & K249) to Order</button>
         </form>
