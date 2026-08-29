@@ -8,7 +8,6 @@ let cart = {};
 let currentSlide = 0;
 let slideInterval;
 
-// 1. ON PAGE LOAD: Check local memory for returning shoppers
 window.onload = function() {
     db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     loadBanners();
@@ -16,6 +15,7 @@ window.onload = function() {
     autoPopulateSavedCustomer();
 };
 
+// 1. AUTO-POPULATE LOCAL STORAGE DATA FOR RETURNING SHOPPERS
 function autoPopulateSavedCustomer() {
     const savedPhone = localStorage.getItem("padesk_phone");
     const savedName = localStorage.getItem("padesk_name");
@@ -35,7 +35,7 @@ function autoPopulateSavedCustomer() {
     }
 }
 
-// 2. DYNAMIC LOOKUP: Check Supabase if shopper types a recognized phone number
+// 2. DYNAMIC CUSTOMER LOOKUP ON PHONE INPUT
 async function checkReturningCustomer(phone) {
     const cleanPhone = phone.trim();
     if (cleanPhone.length < 10) return;
@@ -55,58 +55,7 @@ async function checkReturningCustomer(phone) {
     }
 }
 
-// 3. CHECKOUT: Upsert Customer Master Profile then Save Order
-async function handleCheckout(event) {
-    event.preventDefault();
-    const items = Object.values(cart);
-    const totalCount = items.reduce((sum, item) => sum + item.qty, 0);
-    const totalPrice = items.reduce((sum, item) => {
-        const p = item.product.deal_price ? item.product.deal_price : item.product.price;
-        return sum + (parseFloat(p) * item.qty);
-    }, 0);
-
-    if (totalCount < 3 || totalPrice < 249.00) return alert("Combo criteria not met!");
-
-    const contactPhone = document.getElementById("customer-phone").value.trim();
-    const customerName = document.getElementById("customer-name").value.trim();
-    const selectedOffice = document.getElementById("workplace-select").value;
-
-    // A. Upsert Customer Master Profile
-    const { error: custError } = await db.from('customers').upsert([{
-        phone_number: contactPhone,
-        full_name: customerName,
-        default_office: selectedOffice,
-        last_order_at: new Date().toISOString()
-    }], { onConflict: 'phone_number' });
-
-    if (custError) {
-        console.error("Customer upsert error:", custError.message);
-    }
-
-    // B. Save Order Entry
-    const { error: orderError } = await db.from('orders').insert([{
-        customer_phone: contactPhone,
-        delivery_location: selectedOffice,
-        total_amount: totalPrice,
-        order_items_json: items,
-        status: 'Pending Aggregation'
-    }]);
-
-    if (error = orderError) {
-        alert("Error submitting order: " + error.message);
-    } else {
-        // Cache profile in browser memory for instant recognition next time
-        localStorage.setItem("padesk_phone", contactPhone);
-        localStorage.setItem("padesk_name", customerName);
-        localStorage.setItem("padesk_office", selectedOffice);
-
-        alert(`Zikomo ${customerName}! Your combo order has been submitted successfully.`);
-        cart = {};
-        updateCartUI();
-    }
-}
-
-// 1. SIDEBAR TOGGLE LOGIC
+// 3. SIDEBAR TOGGLE LOGIC
 function toggleSidebar() {
     const sidebar = document.getElementById("filter-sidebar");
     const overlay = document.getElementById("filter-sidebar-overlay");
@@ -117,7 +66,7 @@ function toggleSidebar() {
     }
 }
 
-// 2. INTERACTIVE HERO SLIDER LOGIC WITH AUTO-ADVANCE & DOT SYNC
+// 4. HERO BANNER SLIDER LOGIC
 async function loadBanners() {
     const { data: banners } = await db.from('banners').select('*').eq('is_active', true);
     if (!banners || banners.length === 0) return;
@@ -171,7 +120,7 @@ function syncDotsOnScroll(totalSlides) {
     }
 }
 
-// 3. FETCH PRODUCTS FROM SUPABASE DATABASE MASTER
+// 5. FETCH PRODUCTS FROM DATABASE MASTER
 async function loadProducts() {
     const { data: products, error } = await db.from('products').select('*');
     if (error || !products) {
@@ -184,7 +133,7 @@ async function loadProducts() {
     renderProducts(allProducts);
 }
 
-// 4. BUILD FILTERS & SHORTCUTS DYNAMICALLY FROM DB MASTER
+// 6. BUILD FILTERS & CIRCLE SHORTCUTS DYNAMICALLY FROM DB MASTER
 function buildDynamicMasterFilters() {
     const categories = ['ALL', ...new Set(allProducts.map(p => p.category).filter(Boolean))];
     const categorySelect = document.getElementById("filter-category");
@@ -240,7 +189,7 @@ function selectCircleCategory(catName, element) {
     }
 }
 
-// 5. UNIVERSAL MULTI-FIELD FILTER & SEARCH ENGINE
+// 7. UNIVERSAL SEARCH & FILTER ENGINE
 function applyFilters() {
     const cat = document.getElementById("filter-category")?.value || 'ALL';
     const sub = document.getElementById("filter-subcategory")?.value || 'ALL';
@@ -296,7 +245,7 @@ function renderProducts(products) {
     }).join('');
 }
 
-// 6. QUANTITY BASKET LOGIC & MINIMUM COMBO ENFORCEMENT
+// 8. QUANTITY BASKET & COMBO ENGINE
 function addToCart(product) {
     if (cart[product.id]) {
         cart[product.id].qty += 1;
@@ -366,6 +315,7 @@ function updateCartUI() {
     }
 }
 
+// 9. CHECKOUT WITH IMPLICIT CUSTOMER PROFILE UPSERT
 async function handleCheckout(event) {
     event.preventDefault();
     const items = Object.values(cart);
@@ -377,10 +327,24 @@ async function handleCheckout(event) {
 
     if (totalCount < 3 || totalPrice < 249.00) return alert("Combo criteria not met!");
 
+    const contactPhone = document.getElementById("customer-phone").value.trim();
+    const customerName = document.getElementById("customer-name").value.trim();
     const selectedOffice = document.getElementById("workplace-select").value;
-    const contactPhone = document.getElementById("customer-phone").value;
 
-    const { error } = await db.from('orders').insert([{
+    // A. Upsert Customer Master Profile
+    const { error: custError } = await db.from('customers').upsert([{
+        phone_number: contactPhone,
+        full_name: customerName,
+        default_office: selectedOffice,
+        last_order_at: new Date().toISOString()
+    }], { onConflict: 'phone_number' });
+
+    if (custError) {
+        console.error("Customer record creation error:", custError.message);
+    }
+
+    // B. Create Order Record
+    const { error: orderError } = await db.from('orders').insert([{
         customer_phone: contactPhone,
         delivery_location: selectedOffice,
         total_amount: totalPrice,
@@ -388,10 +352,15 @@ async function handleCheckout(event) {
         status: 'Pending Aggregation'
     }]);
 
-    if (error) {
-        alert("Error: " + error.message);
+    if (orderError) {
+        alert("Error submitting order: " + orderError.message);
     } else {
-        alert("Zikomo! Combo order submitted successfully.");
+        // Save to LocalStorage for instant recognition on next visit
+        localStorage.setItem("padesk_phone", contactPhone);
+        localStorage.setItem("padesk_name", customerName);
+        localStorage.setItem("padesk_office", selectedOffice);
+
+        alert(`Zikomo ${customerName}! Your combo order has been submitted successfully.`);
         cart = {};
         updateCartUI();
     }
