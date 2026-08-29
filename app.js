@@ -15,7 +15,7 @@ window.onload = function() {
     autoPopulateSavedCustomer();
 };
 
-// 1. AUTO-POPULATE & STATE BAR ENGINE (FIXED LOGIN VERIFICATION)
+// 1. AUTO-POPULATE & STATE BAR ENGINE
 function autoPopulateSavedCustomer() {
     const savedPhone = localStorage.getItem("padesk_phone");
     const savedTitle = localStorage.getItem("padesk_title") || "";
@@ -24,10 +24,8 @@ function autoPopulateSavedCustomer() {
     const savedOffice = localStorage.getItem("padesk_office") || "";
 
     const stateBar = document.getElementById("user-state-bar");
-    
     const displayName = savedTitle && savedLastName ? `${savedTitle} ${savedLastName}` : (savedFirstName || "Shopper");
 
-    // Fix: Only strictly require the phone number to confirm login state
     if (savedPhone) {
         if (stateBar) {
             stateBar.style.display = "flex";
@@ -59,7 +57,54 @@ function autoPopulateSavedCustomer() {
     }
 }
 
-// 2. QUICK LOGIN TRIGGER
+// 2. SIGN-OUT FUNCTION
+function signOut() {
+    localStorage.removeItem("padesk_phone");
+    localStorage.removeItem("padesk_title");
+    localStorage.removeItem("padesk_first_name");
+    localStorage.removeItem("padesk_last_name");
+    localStorage.removeItem("padesk_office");
+    localStorage.removeItem("padesk_name");
+
+    if (document.getElementById("customer-phone")) document.getElementById("customer-phone").value = "";
+    if (document.getElementById("customer-title")) document.getElementById("customer-title").value = "";
+    if (document.getElementById("customer-first-name")) document.getElementById("customer-first-name").value = "";
+    if (document.getElementById("customer-last-name")) document.getElementById("customer-last-name").value = "";
+    if (document.getElementById("workplace-select")) document.getElementById("workplace-select").value = "";
+
+    const pastSection = document.getElementById("past-purchases-section");
+    if (pastSection) pastSection.style.display = "none";
+
+    resetAccountDrawerUI();
+
+    const accountDrawer = document.getElementById("account-drawer");
+    if (accountDrawer && accountDrawer.classList.contains("open")) {
+        toggleAccountDrawer();
+    }
+
+    autoPopulateSavedCustomer();
+}
+
+function resetAccountDrawerUI() {
+    const profileBox = document.getElementById("account-profile-info");
+    const historyList = document.getElementById("account-order-history");
+    const signOutBtn = document.getElementById("drawer-signout-btn");
+
+    if (profileBox) {
+        profileBox.innerHTML = `
+            <p style="margin:0;"><small>You are currently browsing as a <strong>Guest</strong>.</small></p>
+            <small style="color:#718096;">Enter your mobile number at checkout or in the top bar to load your account profile.</small>
+        `;
+    }
+    if (historyList) {
+        historyList.innerHTML = "<p><small>No active session found.</small></p>";
+    }
+    if (signOutBtn) {
+        signOutBtn.style.display = "none";
+    }
+}
+
+// 3. QUICK LOGIN TRIGGER
 async function triggerQuickLogin() {
     const input = document.getElementById("quick-phone");
     const btn = document.getElementById("btn-quick-login");
@@ -71,7 +116,7 @@ async function triggerQuickLogin() {
     }
 }
 
-// 3. DYNAMIC CUSTOMER LOOKUP (HANDLES LEGACY MISSING NAMES)
+// 4. DYNAMIC CUSTOMER LOOKUP
 async function checkReturningCustomer(phone, isQuickLogin = false) {
     const cleanPhone = phone.trim();
     if (cleanPhone.length < 9) {
@@ -115,7 +160,8 @@ async function checkReturningCustomer(phone, isQuickLogin = false) {
         if (isQuickLogin) alert("Error connecting to database. Please try again.");
     }
 }
-// 4. LOAD PAST PURCHASES SLIDER (FOR REORDER HINT)
+
+// 5. LOAD PAST PURCHASES SLIDER
 async function loadPastPurchases(phone) {
     const { data: orders } = await db
         .from('orders')
@@ -152,7 +198,7 @@ async function loadPastPurchases(phone) {
     }
 }
 
-// 5. ACCOUNT DETAILS DRAWER TOGGLE & HISTORY FETCH
+// 6. ACCOUNT DETAILS DRAWER TOGGLE & HISTORY FETCH
 function toggleAccountDrawer() {
     const drawer = document.getElementById("account-drawer");
     const overlay = document.getElementById("account-drawer-overlay");
@@ -177,12 +223,14 @@ async function loadAccountHistory(phone) {
     const historyList = document.getElementById("account-order-history");
     const signOutBtn = document.getElementById("drawer-signout-btn");
 
-    const savedName = localStorage.getItem("padesk_name") || "Valued Shopper";
+    const savedTitle = localStorage.getItem("padesk_title") || "";
+    const savedFirstName = localStorage.getItem("padesk_first_name") || "Valued Shopper";
+    const savedLastName = localStorage.getItem("padesk_last_name") || "";
     const savedOffice = localStorage.getItem("padesk_office") || "Not set";
 
     if (profileBox) {
         profileBox.innerHTML = `
-            <strong>${savedName}</strong><br>
+            <strong>${savedTitle} ${savedFirstName} ${savedLastName}</strong><br>
             <small>📱 Phone: ${phone}</small><br>
             <small>🏢 Office: ${savedOffice}</small>
         `;
@@ -213,7 +261,7 @@ async function loadAccountHistory(phone) {
     }
 }
 
-// 6. SIDEBAR DRAWER TOGGLE LOGIC
+// 7. SIDEBAR DRAWER TOGGLE LOGIC
 function toggleSidebar() {
     const sidebar = document.getElementById("filter-sidebar");
     const overlay = document.getElementById("filter-sidebar-overlay");
@@ -224,7 +272,7 @@ function toggleSidebar() {
     }
 }
 
-// 7. HERO BANNER SLIDER LOGIC
+// 8. HERO BANNER SLIDER LOGIC
 async function loadBanners() {
     const { data: banners } = await db.from('banners').select('*').eq('is_active', true);
     if (!banners || banners.length === 0) return;
@@ -278,7 +326,7 @@ function syncDotsOnScroll(totalSlides) {
     }
 }
 
-// 8. FETCH PRODUCTS FROM DATABASE MASTER
+// 9. FETCH PRODUCTS FROM DATABASE MASTER
 async function loadProducts() {
     const { data: products, error } = await db.from('products').select('*');
     if (error || !products) {
@@ -291,7 +339,7 @@ async function loadProducts() {
     renderProducts(allProducts);
 }
 
-// 9. BUILD FILTERS & CIRCLE SHORTCUTS DYNAMICALLY FROM DB MASTER
+// 10. BUILD FILTERS & CIRCLE SHORTCUTS
 function buildDynamicMasterFilters() {
     const categories = ['ALL', ...new Set(allProducts.map(p => p.category).filter(Boolean))];
     const categorySelect = document.getElementById("filter-category");
@@ -347,7 +395,7 @@ function selectCircleCategory(catName, element) {
     }
 }
 
-// 10. UNIVERSAL SEARCH & FILTER ENGINE
+// 11. UNIVERSAL SEARCH & FILTER ENGINE
 function applyFilters() {
     const cat = document.getElementById("filter-category")?.value || 'ALL';
     const sub = document.getElementById("filter-subcategory")?.value || 'ALL';
@@ -403,7 +451,7 @@ function renderProducts(products) {
     }).join('');
 }
 
-// 11. QUANTITY BASKET & COMBO ENGINE
+// 12. QUANTITY BASKET & COMBO ENGINE
 function addToCart(product) {
     if (cart[product.id]) {
         cart[product.id].qty += 1;
@@ -473,7 +521,7 @@ function updateCartUI() {
     }
 }
 
-// 12. CHECKOUT WITH IMPLICIT CUSTOMER PROFILE UPSERT
+// 13. CHECKOUT WITH IMPLICIT CUSTOMER PROFILE UPSERT
 async function handleCheckout(event) {
     event.preventDefault();
     
@@ -490,7 +538,7 @@ async function handleCheckout(event) {
         }, 0);
 
         if (totalCount < 3 || totalPrice < 249.00) {
-            updateCartUI(); // Reset button
+            updateCartUI();
             return alert("Combo criteria not met!");
         }
 
@@ -500,7 +548,6 @@ async function handleCheckout(event) {
         const cLastName = document.getElementById("customer-last-name").value.trim();
         const selectedOffice = document.getElementById("workplace-select").value;
 
-        // 1. Update Customer Master
         const { error: custError } = await db.from('customers').upsert([{
             phone_number: contactPhone,
             title: cTitle,
@@ -511,10 +558,9 @@ async function handleCheckout(event) {
         }], { onConflict: 'phone_number' });
 
         if (custError) {
-            throw new Error("Supabase Customers Table Error: " + custError.message + "\n\nDid you run the ALTER TABLE SQL script?");
+            throw new Error("Supabase Customers Table Error: " + custError.message);
         }
 
-        // 2. Save Order
         const { error: orderError } = await db.from('orders').insert([{
             customer_phone: contactPhone,
             delivery_location: selectedOffice,
@@ -527,7 +573,6 @@ async function handleCheckout(event) {
             throw new Error("Supabase Orders Table Error: " + orderError.message);
         }
 
-        // 3. Success! Save to cache
         localStorage.setItem("padesk_phone", contactPhone);
         localStorage.setItem("padesk_title", cTitle);
         localStorage.setItem("padesk_first_name", cFirstName);
@@ -543,6 +588,6 @@ async function handleCheckout(event) {
     } catch (error) {
         console.error(error);
         alert("Action Failed:\n" + error.message);
-        updateCartUI(); // Reset button state on failure
+        updateCartUI();
     }
 }
