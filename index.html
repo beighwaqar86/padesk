@@ -78,7 +78,14 @@
             <div id="item-count-rule" class="rule-badge">❌ Items: 0 / 3 min</div>
             <div id="price-rule" class="rule-badge">❌ Total: K 0.00 / K 249.00 min</div>
         </div>
-
+<div style="margin-bottom: 16px;">
+                <label for="payment-method-select" style="display:block; font-weight:700; font-size:0.8rem; margin-bottom:6px; color:#4a5568;">💳 Payment Option</label>
+                <select id="payment-method-select" required class="form-input">
+                    <option value="Mobile Money">Mobile Money (MTN / Airtel)</option>
+                    <option value="VISA">VISA / Mastercard</option>
+                    <option value="Cash on Delivery">Cash on Delivery (CoD)</option>
+                </select>
+            </div>
         <form id="checkout-form" onsubmit="handleCheckout(event)">
             
             <div style="margin-bottom: 16px;">
