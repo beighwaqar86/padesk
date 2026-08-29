@@ -78,14 +78,7 @@
             <div id="item-count-rule" class="rule-badge">❌ Items: 0 / 3 min</div>
             <div id="price-rule" class="rule-badge">❌ Total: K 0.00 / K 249.00 min</div>
         </div>
-<div style="margin-bottom: 16px;">
-                <label for="payment-method-select" style="display:block; font-weight:700; font-size:0.8rem; margin-bottom:6px; color:#4a5568;">💳 Payment Option</label>
-                <select id="payment-method-select" required class="form-input">
-                    <option value="Mobile Money">Mobile Money (MTN / Airtel)</option>
-                    <option value="VISA">VISA / Mastercard</option>
-                    <option value="Cash on Delivery">Cash on Delivery (CoD)</option>
-                </select>
-            </div>
+
         <form id="checkout-form" onsubmit="handleCheckout(event)">
             
             <div style="margin-bottom: 16px;">
@@ -95,6 +88,15 @@
                     <option value="New Government Complex">New Government Complex (Independence Ave)</option>
                     <option value="Ministry of Finance">Ministry of Finance (Haile Selassie Ave)</option>
                     <option value="Zanaco HQ">Zanaco HQ (Cairo Road)</option>
+                </select>
+            </div>
+
+            <div style="margin-bottom: 16px;">
+                <label for="payment-method-select" style="display:block; font-weight:700; font-size:0.8rem; margin-bottom:6px; color:#4a5568;">💳 Payment Option</label>
+                <select id="payment-method-select" required class="form-input">
+                    <option value="Mobile Money">Mobile Money (MTN / Airtel)</option>
+                    <option value="VISA">VISA / Mastercard</option>
+                    <option value="Cash on Delivery">Cash on Delivery (CoD)</option>
                 </select>
             </div>
 
@@ -142,7 +144,11 @@
             <div class="account-profile-box" id="preview-customer-details"></div>
 
             <h4 style="margin: 12px 0 6px; font-size: 0.9rem;">Items Summary</h4>
-            <div id="preview-items-list" style="max-height: 180px; overflow-y: auto; margin-bottom: 12px; border-bottom: 1px solid #edf2f7; padding-bottom: 8px;"></div>
+            <div id="preview-items-list" style="max-height: 160px; overflow-y: auto; margin-bottom: 10px; border-bottom: 1px solid #edf2f7; padding-bottom: 6px;"></div>
+
+            <div style="font-size: 0.85rem; margin-bottom: 12px; background: #f7fafc; padding: 8px; border-radius: 6px;">
+                <span>Payment Method: <strong id="preview-payment-method" style="color: #2b6cb0;">-</strong></span>
+            </div>
 
             <div style="display: flex; justify-content: space-between; font-weight: 800; font-size: 1rem; margin-bottom: 16px;">
                 <span>Total Amount:</span>
