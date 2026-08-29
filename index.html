@@ -143,20 +143,26 @@
         </div>
         <div class="sidebar-content">
             <div class="filter-group">
+                <label>Business</label>
+                <select id="filter-business" onchange="handleBusinessSidebarChange()" class="form-input">
+                    <option value="ALL">All Businesses</option>
+                </select>
+            </div>
+            <div class="filter-group">
                 <label>Category</label>
-                <select id="filter-category" onchange="handleCategoryChange()">
+                <select id="filter-category" onchange="handleCategorySidebarChange()" class="form-input">
                     <option value="ALL">All Categories</option>
                 </select>
             </div>
             <div class="filter-group">
                 <label>Sub-Category</label>
-                <select id="filter-subcategory" onchange="applyFilters()">
+                <select id="filter-subcategory" onchange="applyFilters()" class="form-input">
                     <option value="ALL">All Sub-Categories</option>
                 </select>
             </div>
             <div class="filter-group">
                 <label>Brand</label>
-                <select id="filter-brand" onchange="applyFilters()">
+                <select id="filter-brand" onchange="applyFilters()" class="form-input">
                     <option value="ALL">All Brands</option>
                 </select>
             </div>
@@ -165,7 +171,6 @@
             </button>
         </div>
     </aside>
-
     <!-- Account Details Drawer -->
     <div id="account-drawer-overlay" class="sidebar-overlay" onclick="toggleAccountDrawer()"></div>
     <aside id="account-drawer" class="filter-sidebar">
