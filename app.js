@@ -8,10 +8,12 @@ let cart = {};
 let currentSlide = 0;
 let slideInterval;
 
+// 1. ON PAGE LOAD: Check local memory for returning shoppers
 window.onload = function() {
     db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     loadBanners();
     loadProducts();
+    autoPopulateSavedCustomer();
 };
 
 // 1. SIDEBAR TOGGLE LOGIC
