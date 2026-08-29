@@ -776,7 +776,9 @@ async function executeFinalOrderSubmission() {
         updateCartUI();
         autoPopulateSavedCustomer();
         
-        alert(`Zikomo ${cTitle} ${cLastName || cFirstName}! Your combo order has been submitted successfully.`);
+       // Inside executeFinalOrderSubmission() in app.js:
+// Fetch the latest generated order number or display a confirmation message
+alert(`Zikomo ${cTitle} ${cLastName || cFirstName}! Your combo order has been placed successfully via ${paymentMethod}.`);
 
     } catch (error) {
         console.error(error);
