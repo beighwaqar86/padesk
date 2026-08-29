@@ -299,3 +299,4 @@ async function handleCheckout(event) {
     }
 }
 }
+}
