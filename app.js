@@ -6,6 +6,15 @@ let db;
 let allProducts = [];
 let cart = {}; // Object format: { productId: { product, qty } }
 
+// Sub-Categories Map for Daily Needs
+const dailyNeedsSubMap = [
+    { name: 'All Daily', icon: '🧺', value: 'ALL' },
+    { name: 'Grocery', icon: '🌾', value: 'Grocery' },
+    { name: 'Household Essentials', icon: '🧹', value: 'Household Essentials' },
+    { name: 'Personal Care', icon: '🧴', value: 'Personal Care' },
+    { name: 'Baby Care', icon: '🍼', value: 'Baby Care' }
+];
+
 window.onload = function() {
     db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     loadBanners();
@@ -44,13 +53,16 @@ async function loadProducts() {
 function populateFilterDropdowns() {
     const categories = ['ALL', ...new Set(allProducts.map(p => p.category).filter(Boolean))];
     const categorySelect = document.getElementById("filter-category");
-    categorySelect.innerHTML = categories.map(c => `<option value="${c}">${c}</option>`).join('');
+    if (categorySelect) {
+        categorySelect.innerHTML = categories.map(c => `<option value="${c}">${c}</option>`).join('');
+    }
 
     handleCategoryChange();
 }
 
 function handleCategoryChange() {
-    const selectedCategory = document.getElementById("filter-category").value;
+    const categorySelect = document.getElementById("filter-category");
+    const selectedCategory = categorySelect ? categorySelect.value : 'ALL';
 
     const filteredForSub = selectedCategory === 'ALL' 
         ? allProducts 
@@ -58,20 +70,24 @@ function handleCategoryChange() {
 
     const subcategories = ['ALL', ...new Set(filteredForSub.map(p => p.sub_category).filter(Boolean))];
     const subSelect = document.getElementById("filter-subcategory");
-    subSelect.innerHTML = subcategories.map(s => `<option value="${s}">${s}</option>`).join('');
+    if (subSelect) {
+        subSelect.innerHTML = subcategories.map(s => `<option value="${s}">${s}</option>`).join('');
+    }
 
     const brands = ['ALL', ...new Set(filteredForSub.map(p => p.brand).filter(Boolean))];
     const brandSelect = document.getElementById("filter-brand");
-    brandSelect.innerHTML = brands.map(b => `<option value="${b}">${b}</option>`).join('');
+    if (brandSelect) {
+        brandSelect.innerHTML = brands.map(b => `<option value="${b}">${b}</option>`).join('');
+    }
 
     applyFilters();
 }
 
 // UNIVERSAL FILTER + SEARCH ENGINE
 function applyFilters() {
-    const cat = document.getElementById("filter-category").value;
-    const sub = document.getElementById("filter-subcategory").value;
-    const brand = document.getElementById("filter-brand").value;
+    const cat = document.getElementById("filter-category")?.value || 'ALL';
+    const sub = document.getElementById("filter-subcategory")?.value || 'ALL';
+    const brand = document.getElementById("filter-brand")?.value || 'ALL';
     const searchQuery = (document.getElementById("search-input")?.value || "").toLowerCase().trim();
 
     let filtered = allProducts;
@@ -115,6 +131,49 @@ function renderProducts(products) {
             </div>
         </div>
     `).join('');
+}
+
+// CIRCULAR SHORTCUT HANDLERS
+function selectCircleCategory(catName, element) {
+    // 1. Update visual active state on category circles
+    document.querySelectorAll('#category-circles .circle-item').forEach(el => el.classList.remove('active'));
+    if (element) element.classList.add('active');
+
+    // 2. Sync with existing dropdown filter
+    const catSelect = document.getElementById("filter-category");
+    if (catSelect) {
+        catSelect.value = catName === 'Daily Needs' ? 'Food Cupboard' : (catName === 'ALL' ? 'ALL' : catName);
+        handleCategoryChange();
+    }
+
+    // 3. Render Sub-Category Circle Shortcuts if "Daily Needs" is tapped
+    const subContainer = document.getElementById("subcategory-circles");
+    if (subContainer) {
+        if (catName === 'Daily Needs') {
+            subContainer.style.display = 'flex';
+            subContainer.innerHTML = dailyNeedsSubMap.map((sub, index) => `
+                <div class="circle-item ${index === 0 ? 'active' : ''}" onclick="selectCircleSubcategory('${sub.value}', this)">
+                    <div class="circle-icon">${sub.icon}</div>
+                    <span>${sub.name}</span>
+                </div>
+            `).join('');
+        } else {
+            subContainer.style.display = 'none';
+        }
+    }
+}
+
+function selectCircleSubcategory(subValue, element) {
+    // 1. Update active state on subcategory circles
+    document.querySelectorAll('#subcategory-circles .circle-item').forEach(el => el.classList.remove('active'));
+    if (element) element.classList.add('active');
+
+    // 2. Sync with subcategory dropdown filter
+    const subSelect = document.getElementById("filter-subcategory");
+    if (subSelect) {
+        subSelect.value = subValue;
+        applyFilters();
+    }
 }
 
 // QUANTITY-BASED BASKET LOGIC
@@ -166,18 +225,24 @@ function updateCartUI() {
     const hasMinItems = totalCount >= 3;
     const hasMinPrice = totalPrice >= 249.00;
 
-    countRuleEl.innerHTML = hasMinItems ? `✅ Total Items: ${totalCount} (Minimum Met)` : `❌ Total Items: ${totalCount} / 3 min`;
-    countRuleEl.style.color = hasMinItems ? "#088a4f" : "#e53e3e";
+    if (countRuleEl) {
+        countRuleEl.innerHTML = hasMinItems ? `✅ Total Items: ${totalCount} (Minimum Met)` : `❌ Total Items: ${totalCount} / 3 min`;
+        countRuleEl.style.color = hasMinItems ? "#088a4f" : "#e53e3e";
+    }
 
-    priceRuleEl.innerHTML = hasMinPrice ? `✅ Total: K ${totalPrice.toFixed(2)} (Minimum Met)` : `❌ Total: K ${totalPrice.toFixed(2)} / K 249.00 min`;
-    priceRuleEl.style.color = hasMinPrice ? "#088a4f" : "#e53e3e";
+    if (priceRuleEl) {
+        priceRuleEl.innerHTML = hasMinPrice ? `✅ Total: K ${totalPrice.toFixed(2)} (Minimum Met)` : `❌ Total: K ${totalPrice.toFixed(2)} / K 249.00 min`;
+        priceRuleEl.style.color = hasMinPrice ? "#088a4f" : "#e53e3e";
+    }
 
-    if (hasMinItems && hasMinPrice) {
-        checkoutBtn.disabled = false;
-        checkoutBtn.innerText = `Place Combo Order (K ${totalPrice.toFixed(2)})`;
-    } else {
-        checkoutBtn.disabled = true;
-        checkoutBtn.innerText = "Build Min Combo (3 Items & K249) to Order";
+    if (checkoutBtn) {
+        if (hasMinItems && hasMinPrice) {
+            checkoutBtn.disabled = false;
+            checkoutBtn.innerText = `Place Combo Order (K ${totalPrice.toFixed(2)})`;
+        } else {
+            checkoutBtn.disabled = true;
+            checkoutBtn.innerText = "Build Min Combo (3 Items & K249) to Order";
+        }
     }
 }
 
@@ -196,7 +261,7 @@ async function handleCheckout(event) {
         customer_phone: contactPhone,
         delivery_location: selectedOffice,
         total_amount: totalPrice,
-        order_items_json: items, // Contains formatted quantity array
+        order_items_json: items,
         status: 'Pending Aggregation'
     }]);
 
@@ -207,52 +272,4 @@ async function handleCheckout(event) {
         cart = {};
         updateCartUI();
     }
-    // Map Sub-Categories for Daily Needs Shortcuts
-const dailyNeedsSubMap = [
-    { name: 'All Daily', icon: '🧺', value: 'ALL' },
-    { name: 'Grocery', icon: '🌾', value: 'Grocery' },
-    { name: 'Household Essentials', icon: '🧹', value: 'Household Essentials' },
-    { name: 'Personal Care', icon: '🧴', value: 'Personal Care' },
-    { name: 'Baby Care', icon: '🍼', value: 'Baby Care' }
-];
-
-function selectCircleCategory(catName, element) {
-    // 1. Update visual active state on category circles
-    document.querySelectorAll('#category-circles .circle-item').forEach(el => el.classList.remove('active'));
-    element.classList.add('active');
-
-    // 2. Sync with existing dropdown filter
-    const catSelect = document.getElementById("filter-category");
-    if (catSelect) {
-        catSelect.value = catName === 'Daily Needs' ? 'Food Cupboard' : (catName === 'ALL' ? 'ALL' : catName);
-        handleCategoryChange();
-    }
-
-    // 3. Render Sub-Category Circle Shortcuts if "Daily Needs" is tapped
-    const subContainer = document.getElementById("subcategory-circles");
-    if (catName === 'Daily Needs') {
-        subContainer.style.display = 'flex';
-        subContainer.innerHTML = dailyNeedsSubMap.map((sub, index) => `
-            <div class="circle-item ${index === 0 ? 'active' : ''}" onclick="selectCircleSubcategory('${sub.value}', this)">
-                <div class="circle-icon">${sub.icon}</div>
-                <span>${sub.name}</span>
-            </div>
-        `).join('');
-    } else {
-        subContainer.style.display = 'none';
-    }
-}
-
-function selectCircleSubcategory(subValue, element) {
-    // 1. Update active state on subcategory circles
-    document.querySelectorAll('#subcategory-circles .circle-item').forEach(el => el.classList.remove('active'));
-    element.classList.add('active');
-
-    // 2. Sync with subcategory dropdown filter
-    const subSelect = document.getElementById("filter-subcategory");
-    if (subSelect) {
-        subSelect.value = subValue;
-        applyFilters();
-    }
-}
 }
