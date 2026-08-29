@@ -15,7 +15,7 @@ window.onload = function() {
     autoPopulateSavedCustomer();
 };
 
-// 1. AUTO-POPULATE & STATE BAR ENGINE (WITH EXPLICIT LOGIN BUTTON)
+// 1. AUTO-POPULATE & STATE BAR ENGINE
 function autoPopulateSavedCustomer() {
     const savedPhone = localStorage.getItem("padesk_phone");
     const savedName = localStorage.getItem("padesk_name");
@@ -50,7 +50,7 @@ function autoPopulateSavedCustomer() {
                 <span>Already ordered?</span>
                 <div class="quick-login-input-wrap">
                     <input type="tel" id="quick-phone" placeholder="Enter Phone" onkeypress="if(event.key==='Enter') triggerQuickLogin()">
-                    <button type="button" onclick="triggerQuickLogin()" style="background:#0baf65; color:white; border:none; border-radius:4px; padding:4px 10px; font-weight:bold; cursor:pointer;">Go</button>
+                    <button type="button" id="btn-quick-login" onclick="triggerQuickLogin()" style="background:#0baf65; color:white; border:none; border-radius:4px; padding:4px 10px; font-weight:bold; cursor:pointer;">Go</button>
                 </div>
             `;
         }
@@ -59,68 +59,27 @@ function autoPopulateSavedCustomer() {
     }
 }
 
-// Quick Login Trigger Helper
-function triggerQuickLogin() {
+// 2. QUICK LOGIN TRIGGER (WITH LOADING STATE)
+async function triggerQuickLogin() {
     const input = document.getElementById("quick-phone");
+    const btn = document.getElementById("btn-quick-login");
+    
     if (input && input.value) {
-        checkReturningCustomer(input.value);
+        if (btn) btn.innerText = "⏳"; // Show loading
+        await checkReturningCustomer(input.value, true);
+        if (btn && btn.innerText === "⏳") btn.innerText = "Go"; // Reset button
     }
 }
 
-// 2. COMPLETE SIGN-OUT FIX (CLEARS BOTH LOCALSTORAGE AND DRAWER DOM)
-function signOut() {
-    localStorage.removeItem("padesk_phone");
-    localStorage.removeItem("padesk_name");
-    localStorage.removeItem("padesk_office");
-
-    const phoneEl = document.getElementById("customer-phone");
-    const nameEl = document.getElementById("customer-name");
-    const officeEl = document.getElementById("workplace-select");
-
-    if (phoneEl) phoneEl.value = "";
-    if (nameEl) nameEl.value = "";
-    if (officeEl) officeEl.value = "";
-
-    const pastSection = document.getElementById("past-purchases-section");
-    if (pastSection) pastSection.style.display = "none";
-
-    // Clear Account Drawer HTML Elements Immediately
-    resetAccountDrawerUI();
-
-    // Close drawer if open
-    const accountDrawer = document.getElementById("account-drawer");
-    if (accountDrawer && accountDrawer.classList.contains("open")) {
-        toggleAccountDrawer();
-    }
-
-    autoPopulateSavedCustomer();
-}
-
-function resetAccountDrawerUI() {
-    const profileBox = document.getElementById("account-profile-info");
-    const historyList = document.getElementById("account-order-history");
-    const signOutBtn = document.getElementById("drawer-signout-btn");
-
-    if (profileBox) {
-        profileBox.innerHTML = `
-            <p style="margin:0;"><small>You are currently browsing as a <strong>Guest</strong>.</small></p>
-            <small style="color:#718096;">Enter your mobile number at checkout or in the top bar to load your account profile.</small>
-        `;
-    }
-    if (historyList) {
-        historyList.innerHTML = "<p><small>No active session found.</small></p>";
-    }
-    if (signOutBtn) {
-        signOutBtn.style.display = "none";
-    }
-}
-
-// 3. DYNAMIC CUSTOMER LOOKUP ON PHONE INPUT
-async function checkReturningCustomer(phone) {
+// 3. DYNAMIC CUSTOMER LOOKUP (WITH FEEDBACK ALERTS)
+async function checkReturningCustomer(phone, isQuickLogin = false) {
     const cleanPhone = phone.trim();
-    if (cleanPhone.length < 10) return;
+    if (cleanPhone.length < 9) {
+        if (isQuickLogin) alert("Please enter a valid phone number.");
+        return;
+    }
 
-    const { data: customer } = await db
+    const { data: customer, error } = await db
         .from('customers')
         .select('*')
         .eq('phone_number', cleanPhone)
@@ -135,11 +94,19 @@ async function checkReturningCustomer(phone) {
         if (officeEl) officeEl.value = customer.default_office;
         if (phoneEl) phoneEl.value = customer.phone_number;
 
+        // Cache the login locally
         localStorage.setItem("padesk_phone", customer.phone_number);
         localStorage.setItem("padesk_name", customer.full_name);
         localStorage.setItem("padesk_office", customer.default_office);
 
+        // Refresh the UI
         autoPopulateSavedCustomer();
+        
+        if (isQuickLogin) alert(`Welcome back, ${customer.full_name}! Your profile and past purchases have been loaded.`);
+    } else {
+        if (isQuickLogin) {
+            alert("No account found for this number. If you are new, simply build your combo and checkout below to create your account!");
+        }
     }
 }
 
