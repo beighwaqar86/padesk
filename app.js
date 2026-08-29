@@ -1,3 +1,4 @@
+// YOUR LIVE SUPABASE KEYS
 const SUPABASE_URL = "https://cziefuaclocpwicwjprb.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_j_MkiOlGUZOBsR8TSxIM1w_pnQ_B1xx";
 
@@ -11,6 +12,7 @@ window.onload = function() {
     loadProducts();
 };
 
+// 1. SIDEBAR TOGGLE LOGIC
 function toggleSidebar() {
     const sidebar = document.getElementById("filter-sidebar");
     const overlay = document.getElementById("filter-sidebar-overlay");
@@ -21,12 +23,15 @@ function toggleSidebar() {
     }
 }
 
+// 2. FETCH MARQUEE BANNERS (DUPLICATED FOR CONTINUOUS LOOP)
 async function loadBanners() {
     const { data: banners } = await db.from('banners').select('*').eq('is_active', true);
     if (!banners || banners.length === 0) return;
+
     const container = document.getElementById("banner-carousel");
     if (container) {
-        container.innerHTML = banners.map(b => `
+        const marqueeList = [...banners, ...banners];
+        container.innerHTML = marqueeList.map(b => `
             <div class="banner-card" style="background-image: url('${b.image_url}');">
                 <div class="banner-overlay">
                     <h4>${b.title || ''}</h4>
@@ -37,6 +42,7 @@ async function loadBanners() {
     }
 }
 
+// 3. FETCH PRODUCTS FROM SUPABASE DATABASE MASTER
 async function loadProducts() {
     const { data: products, error } = await db.from('products').select('*');
     if (error || !products) {
@@ -49,16 +55,14 @@ async function loadProducts() {
     renderProducts(allProducts);
 }
 
-// DYNAMICALLY BUILD FILTERS & SHORTCUTS DIRECTLY FROM DATABASE MASTER
+// 4. BUILD FILTERS & SHORTCUTS DYNAMICALLY FROM DB MASTER
 function buildDynamicMasterFilters() {
-    // 1. Build Dropdown Categories
     const categories = ['ALL', ...new Set(allProducts.map(p => p.category).filter(Boolean))];
     const categorySelect = document.getElementById("filter-category");
     if (categorySelect) {
         categorySelect.innerHTML = categories.map(c => `<option value="${c}">${c}</option>`).join('');
     }
 
-    // 2. Build Category Circle Shortcuts Dynamically from DB
     const categoryCircles = document.getElementById("category-circles");
     if (categoryCircles) {
         const icons = { 'ALL': '🔥', 'Daily Needs': '🛒', 'Beauty': '✨', 'Electronics': '⚡', 'Deals': '🏷️' };
@@ -107,6 +111,7 @@ function selectCircleCategory(catName, element) {
     }
 }
 
+// 5. UNIVERSAL MULTI-FIELD FILTER & SEARCH ENGINE
 function applyFilters() {
     const cat = document.getElementById("filter-category")?.value || 'ALL';
     const sub = document.getElementById("filter-subcategory")?.value || 'ALL';
@@ -162,6 +167,7 @@ function renderProducts(products) {
     }).join('');
 }
 
+// 6. QUANTITY BASKET LOGIC & MINIMUM COMBO ENFORCEMENT
 function addToCart(product) {
     if (cart[product.id]) {
         cart[product.id].qty += 1;
