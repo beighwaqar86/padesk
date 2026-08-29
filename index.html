@@ -95,13 +95,20 @@
                 required
             >
 
-            <label for="customer-name">Full Name:</label>
-            <input 
-                type="text" 
-                id="customer-name" 
-                placeholder="e.g. Mutale Phiri" 
-                required
-            >
+            <!-- Replace the old Full Name input with this: -->
+            <label>Customer Name:</label>
+            <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+                <select id="customer-title" required style="padding: 10px; border: 1px solid #cbd5e0; border-radius: 8px; font-size: 0.9rem; background: #f7fafc;">
+                    <option value="">Title</option>
+                    <option value="Mr.">Mr.</option>
+                    <option value="Mrs.">Mrs.</option>
+                    <option value="Ms.">Ms.</option>
+                    <option value="Dr.">Dr.</option>
+                    <option value="Prof.">Prof.</option>
+                </select>
+                <input type="text" id="customer-first-name" placeholder="First Name" required style="flex: 1; padding: 10px; border: 1px solid #cbd5e0; border-radius: 8px; font-size: 0.9rem; box-sizing: border-box;">
+                <input type="text" id="customer-last-name" placeholder="Last Name" required style="flex: 1; padding: 10px; border: 1px solid #cbd5e0; border-radius: 8px; font-size: 0.9rem; box-sizing: border-box;">
+            </div>
 
             <label for="workplace-select">Select Office Delivery Point:</label>
             <select id="workplace-select" required>
