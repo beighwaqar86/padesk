@@ -417,7 +417,7 @@ function buildDynamicMasterFilters() {
     // Map your business divisions to your local workspace image paths
     const businessImages = {
         'ALL': 'images/business/all.png',          // Fallback or specific all graphic
-        'Groceries': 'images/business/grocery.png', // Uses your uploaded workspace image
+        'Grocery': 'images/business/grocery.png', // Uses your uploaded workspace image
         'Health & Beauty': 'images/business/beauty.png',
         'Stationery': 'images/business/stationery.png',
         'Electronics': 'images/business/electronics.png'
