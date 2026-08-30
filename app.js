@@ -744,6 +744,12 @@ async function executeFinalOrderSubmission() {
         const cFirstName = document.getElementById("customer-first-name").value.trim();
         const cLastName = document.getElementById("customer-last-name").value.trim();
         const selectedOffice = document.getElementById("workplace-select").value;
+        
+        // Properly defined paymentMethod variable from select dropdown
+        const paymentMethodSelect = document.getElementById("payment-method-select");
+        const paymentMethod = paymentSelect ? paymentSelect.value : (paymentMethodSelect ? paymentMethodSelect.value : "Cash on Delivery");
+
+        const initialPaymentStatus = paymentMethod === 'Cash on Delivery' ? 'Pending Collection' : 'Pending Gateway';
 
         const { error: custError } = await db.from('customers').upsert([{
             phone_number: contactPhone,
@@ -756,13 +762,17 @@ async function executeFinalOrderSubmission() {
 
         if (custError) throw new Error("Customers Table Error: " + custError.message);
 
-        const { error: orderError } = await db.from('orders').insert([{
+        // Insert order (Supabase trigger auto-generates order_number)
+        const { data: newOrder, error: orderError } = await db.from('orders').insert([{
             customer_phone: contactPhone,
             delivery_location: selectedOffice,
             total_amount: totalPrice,
             order_items_json: items,
+            payment_method: paymentMethod,
+            payment_status: initialPaymentStatus,
+            fulfillment_status: 'Order Placed',
             status: 'Pending Aggregation'
-        }]);
+        }]).select().single();
 
         if (orderError) throw new Error("Orders Table Error: " + orderError.message);
 
@@ -776,13 +786,14 @@ async function executeFinalOrderSubmission() {
         updateCartUI();
         autoPopulateSavedCustomer();
         
-       // Inside executeFinalOrderSubmission() in app.js:
-// Fetch the latest generated order number or display a confirmation message
-alert(`Zikomo ${cTitle} ${cLastName || cFirstName}! Your combo order has been placed successfully via ${paymentMethod}.`);
+        const displayOrderNo = newOrder && newOrder.order_number ? newOrder.order_number : "Successfully";
+        alert(`Zikomo ${cTitle} ${cLastName || cFirstName}! Order ${displayOrderNo} has been placed via ${paymentMethod}.`);
 
     } catch (error) {
         console.error(error);
         alert("Action Failed:\n" + error.message);
         updateCartUI();
     }
+}
+
 }
