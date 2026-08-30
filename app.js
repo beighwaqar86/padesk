@@ -409,23 +409,31 @@ async function loadProducts() {
     renderProducts(allProducts);
 }
 
-// 10. HIERARCHICAL DRILL-DOWN FILTERS (USING LOCAL WORKSPACE ASSETS)
+//10
+        element.classList.add('active');
+        // 10. HIERARCHICAL DRILL-DOWN FILTERS (STRICT DATABASE MAPPING)
 function buildDynamicMasterFilters() {
-    const businesses = ['ALL', ...new Set(allProducts.map(p => p.business).filter(Boolean))];
+    // Extract unique businesses from database and filter out nulls/duplicates
+    const rawBusinesses = [...new Set(allProducts.map(p => p.business).filter(Boolean))];
+    
+    // Clean up list to ensure strict alignment (dropping rogue duplicates if any)
+    const businesses = ['ALL', ...rawBusinesses.filter(b => b.toLowerCase() !== 'groceries' || b === 'Grocery')];
+
     const businessCircles = document.getElementById("business-circles");
     
-    // Map your business divisions to your local workspace image paths
+    // Local workspace image mapping (using clean lowercase keys for matching)
     const businessImages = {
-        'ALL': 'images/business/all.png',          // Fallback or specific all graphic
-        'Grocery': 'images/business/grocery.png', // Uses your uploaded workspace image
-        'Health & Beauty': 'images/business/beauty.png',
-        'Stationery': 'images/business/stationery.png',
-        'Electronics': 'images/business/electronics.png'
+        'all': 'images/business/all.png',
+        'grocery': 'images/business/grocery.png',
+        'health & beauty': 'images/business/beauty.png',
+        'stationery': 'images/business/stationery.png',
+        'electronics': 'images/business/electronics.png'
     };
 
     if (businessCircles) {
         businessCircles.innerHTML = businesses.map((bus, idx) => {
-            const bgImg = businessImages[bus] || businessImages['ALL'];
+            const key = bus.toLowerCase();
+            const bgImg = businessImages[key] || businessImages['all'];
             return `
                 <div class="circle-item ${idx === 0 ? 'active' : ''}" onclick="selectBusinessCircle('${bus}', this)">
                     <div class="circle-icon" style="background-image: url('${bgImg}'); background-size: cover; background-position: center; border: 2px solid ${idx === 0 ? '#0baf65' : '#e2e8f0'};"></div>
@@ -437,7 +445,6 @@ function buildDynamicMasterFilters() {
 
     applyFilters();
 }
-
 
 function selectBusinessCircle(businessName, element) {
     document.querySelectorAll('#business-circles .circle-item').forEach(el => {
@@ -531,6 +538,7 @@ function selectSubcategoryCircle(subName, element) {
 
     applyFilters();
 }
+
 
 
 // 11. UNIVERSAL SEARCH & HIERARCHICAL FILTER ENGINE
