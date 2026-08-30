@@ -75,6 +75,9 @@ function signOut() {
     const pastSection = document.getElementById("past-purchases-section");
     if (pastSection) pastSection.style.display = "none";
 
+    const customCombosSection = document.getElementById("custom-combos-section");
+    if (customCombosSection) customCombosSection.style.display = "none";
+
     resetAccountDrawerUI();
 
     const accountDrawer = document.getElementById("account-drawer");
@@ -200,29 +203,30 @@ async function loadPastPurchases(phone) {
 
 async function loadCustomerCustomCombos(phone) {
     const { data: combos } = await db.from('customer_combos').select('*').eq('customer_phone', phone);
-    if (!combos || combos.length === 0) return;
+    
+    const sliderContainer = document.getElementById("custom-combos-slider");
+    const sectionContainer = document.getElementById("custom-combos-section");
 
-    // You can inject custom combos into a dedicated UI section or merge into the banner carousel
-    const container = document.getElementById("banner-carousel");
-    if (container && combos.length > 0) {
-        combos.forEach(c => {
+    if (!combos || combos.length === 0) {
+        if (sectionContainer) sectionContainer.style.display = "none";
+        return;
+    }
+
+    if (sliderContainer && sectionContainer) {
+        sectionContainer.style.display = "block";
+        sliderContainer.innerHTML = combos.map(c => {
             const encodedItems = encodeURIComponent(JSON.stringify(c.items_json));
-            const cardHTML = `
-                <div class="banner-card" style="background: linear-gradient(135deg, #0baf65, #088a4f); color: white;">
-                    <div class="banner-overlay" style="display: flex; justify-content: space-between; align-items: flex-end; background: none;">
-                        <div>
-                            <span style="background: rgba(0,0,0,0.3); color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.6rem; font-weight: bold; text-transform: uppercase;">⭐ My Custom Combo</span>
-                            <h4 style="margin: 4px 0 2px; font-size: 0.95rem;">${c.combo_name}</h4>
-                            <p style="margin: 0; font-size: 0.75rem; opacity: 0.95;">Saved Custom Office Bundle</p>
-                        </div>
-                        <button type="button" onclick="addBannerComboToCart('${encodedItems}', '${c.combo_name}')" class="btn-add-combo" style="background: white; color: #0baf65; border: none; padding: 8px 12px; border-radius: 8px; font-weight: 800; font-size: 0.75rem; cursor: pointer; white-space: nowrap;">
-                            + Reorder Combo
-                        </button>
+            return `
+                <div class="past-card" style="min-width: 180px; background: #e6f7f0; border-color: #b2f5ea;">
+                    <div>
+                        <span class="brand-tag" style="color: #088a4f;">Saved Combo</span>
+                        <h5 style="margin: 4px 0; font-size: 0.85rem;">${c.combo_name}</h5>
+                        <small style="color: #718096; font-size: 0.7rem;">${(c.items_json || []).length} items included</small>
                     </div>
+                    <button type="button" onclick="addBannerComboToCart('${encodedItems}', '${c.combo_name}')" class="btn-add" style="margin-top: 8px; padding: 4px 8px; font-size: 0.75rem; background: #0baf65;">+ Add Combo</button>
                 </div>
             `;
-            container.insertAdjacentHTML('afterbegin', cardHTML);
-        });
+        }).join('');
     }
 }
 
@@ -300,7 +304,7 @@ function toggleSidebar() {
     }
 }
 
-// 8. READY-MADE COMBO BANNERS SLIDER
+// 8. READY-MADE ADMIN COMBO BANNERS SLIDER (Exclusively Admin Created)
 async function loadBanners() {
     const { data: banners } = await db.from('banners').select('*').eq('is_active', true);
     if (!banners || banners.length === 0) return;
@@ -800,10 +804,10 @@ async function executeFinalOrderSubmission() {
 
         if (orderError) throw new Error("Orders Table Error: " + orderError.message);
 
-                // 2. Automatically Save / Link Custom Customer Combo (Duplicate Prevented)
+        // 2. Automatically Save / Link Custom Customer Combo (Duplicate Prevented)
         await saveCustomerCustomCombo(contactPhone, items);
 
-        // 🟢 ADD THIS LINE HERE TO LOAD IT INSTANTLY
+        // Instantly reload custom combos on screen
         loadCustomerCustomCombos(contactPhone);
 
         localStorage.setItem("padesk_phone", contactPhone);
@@ -815,7 +819,6 @@ async function executeFinalOrderSubmission() {
         cart = {};
         updateCartUI();
         autoPopulateSavedCustomer();
-
         
         const displayOrderNo = newOrder && newOrder.order_number ? newOrder.order_number : "Successfully";
         alert(`Zikomo ${cTitle} ${cLastName || cFirstName}! Order ${displayOrderNo} has been placed via ${paymentMethod}. Your custom combo has been saved for easy reordering!`);
@@ -830,11 +833,9 @@ async function executeFinalOrderSubmission() {
 // 14. SMART CUSTOM COMBO SAVER WITH DUPLICATE PREVENTION
 async function saveCustomerCustomCombo(phone, items) {
     try {
-        // Create a unique sorted signature based on product IDs and quantities (e.g., "1:1,5:2")
         const signatureParts = items.map(i => `${i.product.id}:${i.qty}`).sort();
         const productSignature = signatureParts.join(',');
 
-        // Check if this exact combo signature already exists for this phone number
         const { data: existingCombos } = await db
             .from('customer_combos')
             .select('id')
@@ -842,10 +843,9 @@ async function saveCustomerCustomCombo(phone, items) {
             .eq('product_signature', productSignature);
 
         if (existingCombos && existingCombos.length > 0) {
-            return; // Already saved, skip duplicate creation
+            return;
         }
 
-        // Generate smart auto-name based on main brands/categories
         const topBrands = [...new Set(items.map(i => i.product.brand).filter(Boolean))];
         const comboName = topBrands.length > 0 
             ? `${topBrands.slice(0, 2).join(' & ')} Office Bundle` 
