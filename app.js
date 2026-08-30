@@ -250,7 +250,7 @@ async function loadAccountHistory(phone) {
             historyList.innerHTML = orders.map(o => `
                 <div class="order-card-mini">
                     <div style="display:flex; justify-content:space-between;">
-                        <strong>Order #${o.id}</strong>
+                        <strong>${o.order_number || ('Order #' + o.id)}</strong>
                         <span style="color:#0baf65; font-weight:bold;">K ${parseFloat(o.total_amount).toFixed(2)}</span>
                     </div>
                     <small style="color:#718096;">Location: ${o.delivery_location || '-'}</small>
@@ -573,7 +573,6 @@ function renderProducts(products) {
 }
 
 // 12. QUANTITY BASKET & COMBO ENGINE
-// 12. QUANTITY BASKET & COMBO ENGINE (WITH BUTTON ANIMATION)
 function addToCart(product, event) {
     if (cart[product.id]) {
         cart[product.id].qty += 1;
@@ -582,7 +581,6 @@ function addToCart(product, event) {
     }
     updateCartUI();
 
-    // Visual Feedback Animation on the clicked button (if event is passed)
     if (event && event.target) {
         const btn = event.target;
         const originalText = btn.innerText;
@@ -595,10 +593,9 @@ function addToCart(product, event) {
             btn.innerText = originalText;
             btn.classList.remove("success");
             btn.disabled = false;
-        }, 800); // Reset after 0.8 seconds
+        }, 800);
     }
 
-    // Subtle pulse effect on the bottom cart sheet to draw the eye
     const cartCard = document.getElementById("cart-section");
     if (cartCard) {
         cartCard.classList.add("pulse");
@@ -667,7 +664,6 @@ function updateCartUI() {
 }
 
 // 13. CHECKOUT PREVIEW MODAL FLOW
-// 13. CHECKOUT PREVIEW MODAL FLOW (FIXED PAYMENT DISPLAY)
 function handleCheckout(event) {
     event.preventDefault();
 
@@ -689,8 +685,8 @@ function handleCheckout(event) {
     const cLastName = document.getElementById("customer-last-name").value.trim();
     const selectedOffice = document.getElementById("workplace-select").value;
     
-    const paymentSelect = document.getElementById("payment-method-select");
-    const paymentMethod = paymentSelect ? paymentSelect.value : "";
+    const paymentMethodSelect = document.getElementById("payment-method-select");
+    const paymentMethod = paymentMethodSelect ? paymentMethodSelect.value : "";
 
     if (!paymentMethod) {
         alert("Please select a payment option before checkout.");
@@ -745,9 +741,8 @@ async function executeFinalOrderSubmission() {
         const cLastName = document.getElementById("customer-last-name").value.trim();
         const selectedOffice = document.getElementById("workplace-select").value;
         
-        // Properly defined paymentMethod variable from select dropdown
         const paymentMethodSelect = document.getElementById("payment-method-select");
-        const paymentMethod = paymentSelect ? paymentSelect.value : (paymentMethodSelect ? paymentMethodSelect.value : "Cash on Delivery");
+        const paymentMethod = paymentMethodSelect ? paymentMethodSelect.value : "Cash on Delivery";
 
         const initialPaymentStatus = paymentMethod === 'Cash on Delivery' ? 'Pending Collection' : 'Pending Gateway';
 
@@ -762,7 +757,6 @@ async function executeFinalOrderSubmission() {
 
         if (custError) throw new Error("Customers Table Error: " + custError.message);
 
-        // Insert order (Supabase trigger auto-generates order_number)
         const { data: newOrder, error: orderError } = await db.from('orders').insert([{
             customer_phone: contactPhone,
             delivery_location: selectedOffice,
@@ -794,6 +788,4 @@ async function executeFinalOrderSubmission() {
         alert("Action Failed:\n" + error.message);
         updateCartUI();
     }
-}
-
 }
