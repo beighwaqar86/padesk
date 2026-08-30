@@ -31,7 +31,7 @@
         🚛 Delivery: Tuesdays & Thursdays | Min Combo: 3 Items & K249 Total
     </div>
 
-    <!-- Interactive Hero Banner Slider Area (Reserved strictly for PaDesk Admin Combos) -->
+    <!-- Interactive Hero Banner Slider Area (Top Slider with + Add Combo on Top Right) -->
     <section class="banner-section">
         <div id="banner-carousel" class="banner-carousel"></div>
         <div id="slider-dots" class="slider-dots"></div>
@@ -44,7 +44,7 @@
         <div class="circle-shortcuts-container sub-circles" id="subcategory-circles" style="display: none;"></div>
     </div>
 
-    <!-- Search Bar & Sidebar Filter Toggle Bar -->
+    <!-- Search Bar & Cart Quick-Jump Graphic Button -->
     <div class="search-filter-bar">
         <input 
             type="text" 
@@ -52,8 +52,8 @@
             placeholder="🔍 Search name, code, category, brand..." 
             oninput="applyFilters()"
         >
-        <button type="button" class="btn-filter-toggle" onclick="toggleSidebar()">
-            ⚙️ Filters
+        <button type="button" class="btn-filter-toggle" onclick="scrollToCartSection()" style="background: #0baf65; color: white; display: flex; align-items: center; gap: 6px; border: none; cursor: pointer; padding: 10px 14px; border-radius: 8px; font-weight: bold;">
+            🛒 <span id="header-cart-count">0</span> items
         </button>
     </div>
 
@@ -168,38 +168,6 @@
             </div>
         </div>
     </div>
-
-    <!-- Sidebar Filter Drawer -->
-    <div id="filter-sidebar-overlay" class="sidebar-overlay" onclick="toggleSidebar()"></div>
-    <aside id="filter-sidebar" class="filter-sidebar">
-        <div class="sidebar-header">
-            <h3>Filter Products</h3>
-            <button type="button" class="btn-close-sidebar" onclick="toggleSidebar()">✕</button>
-        </div>
-        <div class="sidebar-content">
-            <div class="filter-group">
-                <label>Category</label>
-                <select id="filter-category" onchange="handleCategoryChange()" class="form-input">
-                    <option value="ALL">All Categories</option>
-                </select>
-            </div>
-            <div class="filter-group">
-                <label>Sub-Category</label>
-                <select id="filter-subcategory" onchange="applyFilters()" class="form-input">
-                    <option value="ALL">All Sub-Categories</option>
-                </select>
-            </div>
-            <div class="filter-group">
-                <label>Brand</label>
-                <select id="filter-brand" onchange="applyFilters()" class="form-input">
-                    <option value="ALL">All Brands</option>
-                </select>
-            </div>
-            <button type="button" class="btn-primary" onclick="toggleSidebar()" style="margin-top: 20px;">
-                Apply Filters
-            </button>
-        </div>
-    </aside>
 
     <!-- Account Details Drawer -->
     <div id="account-drawer-overlay" class="sidebar-overlay" onclick="toggleAccountDrawer()"></div>
