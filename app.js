@@ -195,48 +195,40 @@ async function loadPastPurchases(phone) {
                     <h5>${p.name}</h5>
                     <div class="price" style="font-size:0.8rem; margin:2px 0;">K ${parseFloat(p.deal_price || p.price).toFixed(2)}</div>
                 </div>
-                <button onclick='addToCart(${JSON.stringify(p)}, event)' class="btn-add" style="padding:4px 8px; font-size:0.75rem;">+ Reorder</button>
-            </div>
-        `).join('');
-    }
-}
-
-async function loadPastPurchases(phone) {
-    const { data: orders } = await db
-        .from('orders')
-        .select('order_items_json')
-        .eq('customer_phone', phone);
-
-    if (!orders || orders.length === 0) return;
-
-    const pastItemsMap = {};
-    orders.forEach(o => {
-        const items = o.order_items_json || [];
-        items.forEach(item => {
-            const p = item.product;
-            if (p && !pastItemsMap[p.id]) pastItemsMap[p.id] = p;
-        });
-    });
-
-    const uniquePastProducts = Object.values(pastItemsMap);
-    const sliderContainer = document.getElementById("past-purchases-slider");
-    const sectionContainer = document.getElementById("past-purchases-section");
-
-    if (uniquePastProducts.length > 0 && sliderContainer && sectionContainer) {
-        sectionContainer.style.display = "block";
-        sliderContainer.innerHTML = uniquePastProducts.map(p => `
-            <div class="past-card">
-                <div>
-                    <span class="brand-tag">${p.brand || 'General'}</span>
-                    <h5>${p.name}</h5>
-                    <div class="price" style="font-size:0.8rem; margin:2px 0;">K ${parseFloat(p.deal_price || p.price).toFixed(2)}</div>
-                </div>
                 <button onclick='addToCart(${JSON.stringify(p)}, event)' class="btn-add" style="padding:4px 8px; font-size:0.75rem;">+ Add to Combo</button>
             </div>
         `).join('');
     }
 }
 
+async function loadCustomerCustomCombos(phone) {
+    const { data: combos } = await db.from('customer_combos').select('*').eq('customer_phone', phone);
+    
+    const sliderContainer = document.getElementById("custom-combos-slider");
+    const sectionContainer = document.getElementById("custom-combos-section");
+
+    if (!combos || combos.length === 0) {
+        if (sectionContainer) sectionContainer.style.display = "none";
+        return;
+    }
+
+    if (sliderContainer && sectionContainer) {
+        sectionContainer.style.display = "block";
+        sliderContainer.innerHTML = combos.map(c => {
+            const encodedItems = encodeURIComponent(JSON.stringify(c.items_json));
+            return `
+                <div class="past-card" style="min-width: 180px; background: #e6f7f0; border-color: #b2f5ea;">
+                    <div>
+                        <span class="brand-tag" style="color: #088a4f;">Saved Combo</span>
+                        <h5 style="margin: 4px 0; font-size: 0.85rem;">${c.combo_name}</h5>
+                        <small style="color: #718096; font-size: 0.7rem;">${(c.items_json || []).length} items included</small>
+                    </div>
+                    <button type="button" onclick="addBannerComboToCart('${encodedItems}', '${c.combo_name}')" class="btn-add" style="margin-top: 8px; padding: 4px 8px; font-size: 0.75rem; background: #0baf65;">+ Add Combo</button>
+                </div>
+            `;
+        }).join('');
+    }
+}
 
 // 6. ACCOUNT DETAILS DRAWER TOGGLE & HISTORY FETCH
 function toggleAccountDrawer() {
@@ -312,7 +304,7 @@ function toggleSidebar() {
     }
 }
 
-// 8. READY-MADE ADMIN COMBO BANNERS SLIDER (Exclusively Admin Created)
+// 8. READY-MADE ADMIN COMBO BANNERS SLIDER
 async function loadBanners() {
     const { data: banners } = await db.from('banners').select('*').eq('is_active', true);
     if (!banners || banners.length === 0) return;
