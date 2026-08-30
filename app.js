@@ -410,26 +410,47 @@ async function loadProducts() {
 }
 
 // 10. HIERARCHICAL DRILL-DOWN FILTERS (BUSINESS -> CATEGORY -> SUBCATEGORY)
+// 10. HIERARCHICAL DRILL-DOWN FILTERS (WITH MODERN THUMBNAIL IMAGES)
 function buildDynamicMasterFilters() {
     const businesses = ['ALL', ...new Set(allProducts.map(p => p.business).filter(Boolean))];
     const businessCircles = document.getElementById("business-circles");
     
+    // Curated high-res aesthetic thumbnails for each business division
+    const businessImages = {
+        'ALL': 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=300&q=80',
+        'Groceries': 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=300&q=80',
+        'Health & Beauty': 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=300&q=80',
+        'Stationery': 'https://images.unsplash.com/photo-1583485088034-697b5bc54ccd?auto=format&fit=crop&w=300&q=80',
+        'Electronics': 'https://images.unsplash.com/photo-1550009158-9ebf69173e03?auto=format&fit=crop&w=300&q=80'
+    };
+
     if (businessCircles) {
-        const icons = { 'ALL': '🔥', 'Groceries': '🛒', 'Retail': '🛍️', 'Electronics': '⚡', 'Beauty': '✨' };
-        businessCircles.innerHTML = businesses.map((bus, idx) => `
-            <div class="circle-item ${idx === 0 ? 'active' : ''}" onclick="selectBusinessCircle('${bus}', this)">
-                <div class="circle-icon">${icons[bus] || '🏢'}</div>
-                <span>${bus}</span>
-            </div>
-        `).join('');
+        businessCircles.innerHTML = businesses.map((bus, idx) => {
+            const bgImg = businessImages[bus] || businessImages['ALL'];
+            return `
+                <div class="circle-item ${idx === 0 ? 'active' : ''}" onclick="selectBusinessCircle('${bus}', this)">
+                    <div class="circle-icon" style="background-image: url('${bgImg}'); background-size: cover; background-position: center; border: 2px solid ${idx === 0 ? '#0baf65' : '#e2e8f0'};"></div>
+                    <span>${bus}</span>
+                </div>
+            `;
+        }).join('');
     }
 
     applyFilters();
 }
 
 function selectBusinessCircle(businessName, element) {
-    document.querySelectorAll('#business-circles .circle-item').forEach(el => el.classList.remove('active'));
-    if (element) element.classList.add('active');
+    document.querySelectorAll('#business-circles .circle-item').forEach(el => {
+        el.classList.remove('active');
+        const iconDiv = el.querySelector('.circle-icon');
+        if (iconDiv) iconDiv.style.borderColor = '#e2e8f0';
+    });
+    
+    if (element) {
+        element.classList.add('active');
+        const activeIcon = element.querySelector('.circle-icon');
+        if (activeIcon) activeIcon.style.borderColor = '#0baf65';
+    }
 
     const catCirclesContainer = document.getElementById("category-circles");
     const subCirclesContainer = document.getElementById("subcategory-circles");
@@ -446,7 +467,7 @@ function selectBusinessCircle(businessName, element) {
             catCirclesContainer.style.display = 'flex';
             catCirclesContainer.innerHTML = categories.map((cat, idx) => `
                 <div class="circle-item ${idx === 0 ? 'active' : ''}" onclick="selectCategoryCircle('${businessName}', '${cat}', this)">
-                    <div class="circle-icon" style="width:48px; height:48px; font-size:1.1rem;">📂</div>
+                    <div class="circle-icon" style="width:48px; height:48px; background: linear-gradient(135deg, #f7fafc, #edf2f7); border: 2px solid ${idx === 0 ? '#0baf65' : '#cbd5e0'}; display: flex; align-items: center; justify-content: center; font-size: 1.1rem;">📦</div>
                     <span style="font-size:0.68rem;">${cat}</span>
                 </div>
             `).join('');
@@ -459,8 +480,17 @@ function selectBusinessCircle(businessName, element) {
 }
 
 function selectCategoryCircle(businessName, categoryName, element) {
-    document.querySelectorAll('#category-circles .circle-item').forEach(el => el.classList.remove('active'));
-    if (element) element.classList.add('active');
+    document.querySelectorAll('#category-circles .circle-item').forEach(el => {
+        el.classList.remove('active');
+        const iconDiv = el.querySelector('.circle-icon');
+        if (iconDiv) iconDiv.style.borderColor = '#cbd5e0';
+    });
+
+    if (element) {
+        element.classList.add('active');
+        const activeIcon = element.querySelector('.circle-icon');
+        if (activeIcon) activeIcon.style.borderColor = '#0baf65';
+    }
 
     const subCirclesContainer = document.getElementById("subcategory-circles");
 
@@ -474,7 +504,7 @@ function selectCategoryCircle(businessName, categoryName, element) {
             subCirclesContainer.style.display = 'flex';
             subCirclesContainer.innerHTML = subcategories.map((sub, idx) => `
                 <div class="circle-item ${idx === 0 ? 'active' : ''}" onclick="selectSubcategoryCircle('${sub}', this)">
-                    <div class="circle-icon" style="width:42px; height:42px; font-size:1rem;">📌</div>
+                    <div class="circle-icon" style="width:42px; height:42px; background: #edf2f7; border: 2px solid ${idx === 0 ? '#0baf65' : '#cbd5e0'}; display: flex; align-items: center; justify-content: center; font-size: 0.9rem;">📌</div>
                     <span style="font-size:0.65rem;">${sub}</span>
                 </div>
             `).join('');
@@ -487,11 +517,21 @@ function selectCategoryCircle(businessName, categoryName, element) {
 }
 
 function selectSubcategoryCircle(subName, element) {
-    document.querySelectorAll('#subcategory-circles .circle-item').forEach(el => el.classList.remove('active'));
-    if (element) element.classList.add('active');
+    document.querySelectorAll('#subcategory-circles .circle-item').forEach(el => {
+        el.classList.remove('active');
+        const iconDiv = el.querySelector('.circle-icon');
+        if (iconDiv) iconDiv.style.borderColor = '#cbd5e0';
+    });
+
+    if (element) {
+        element.classList.add('active');
+        const activeIcon = element.querySelector('.circle-icon');
+        if (activeIcon) activeIcon.style.borderColor = '#0baf65';
+    }
 
     applyFilters();
 }
+
 
 // 11. UNIVERSAL SEARCH & HIERARCHICAL FILTER ENGINE
 function applyFilters() {
