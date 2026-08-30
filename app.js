@@ -409,19 +409,18 @@ async function loadProducts() {
     renderProducts(allProducts);
 }
 
-// 10. HIERARCHICAL DRILL-DOWN FILTERS (BUSINESS -> CATEGORY -> SUBCATEGORY)
-// 10. HIERARCHICAL DRILL-DOWN FILTERS (WITH MODERN THUMBNAIL IMAGES)
+// 10. HIERARCHICAL DRILL-DOWN FILTERS (USING LOCAL WORKSPACE ASSETS)
 function buildDynamicMasterFilters() {
     const businesses = ['ALL', ...new Set(allProducts.map(p => p.business).filter(Boolean))];
     const businessCircles = document.getElementById("business-circles");
     
-    // Curated high-res aesthetic thumbnails for each business division
+    // Map your business divisions to your local workspace image paths
     const businessImages = {
-        'ALL': 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=300&q=80',
-        'Groceries': 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=300&q=80',
-        'Health & Beauty': 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=300&q=80',
-        'Stationery': 'https://images.unsplash.com/photo-1583485088034-697b5bc54ccd?auto=format&fit=crop&w=300&q=80',
-        'Electronics': 'https://images.unsplash.com/photo-1550009158-9ebf69173e03?auto=format&fit=crop&w=300&q=80'
+        'ALL': 'images/business/all.png',          // Fallback or specific all graphic
+        'Groceries': 'images/business/grocery.png', // Uses your uploaded workspace image
+        'Health & Beauty': 'images/business/beauty.png',
+        'Stationery': 'images/business/stationery.png',
+        'Electronics': 'images/business/electronics.png'
     };
 
     if (businessCircles) {
@@ -438,6 +437,7 @@ function buildDynamicMasterFilters() {
 
     applyFilters();
 }
+
 
 function selectBusinessCircle(businessName, element) {
     document.querySelectorAll('#business-circles .circle-item').forEach(el => {
