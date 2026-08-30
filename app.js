@@ -301,7 +301,7 @@ async function loadAccountHistory(phone) {
     }
 }
 
-// 8. READY-MADE ADMIN COMBO BANNERS SLIDER (+ Add Combo positioned on top right corner)
+// 7. READY-MADE ADMIN COMBO BANNERS SLIDER (+ Add Combo on Top Right Corner)
 async function loadBanners() {
     const { data: banners } = await db.from('banners').select('*').eq('is_active', true);
     if (!banners || banners.length === 0) return;
@@ -396,7 +396,7 @@ function syncDotsOnScroll(totalSlides) {
     }
 }
 
-// 9. FETCH PRODUCTS FROM DATABASE MASTER
+// 8. FETCH PRODUCTS FROM DATABASE MASTER
 async function loadProducts() {
     const { data: products, error } = await db.from('products').select('*').eq('is_active', true);
     if (error || !products) {
@@ -409,37 +409,41 @@ async function loadProducts() {
     renderProducts(allProducts);
 }
 
-//10
-        element.classList.add('active');
-        // 10. HIERARCHICAL DRILL-DOWN FILTERS (STRICT DATABASE MAPPING)
+// 9. HIERARCHICAL DRILL-DOWN FILTERS (LOCAL WORKSPACE IMAGES & FALLBACK GRAPHIC FOR 'ALL')
 function buildDynamicMasterFilters() {
-    // Extract unique businesses from database and filter out nulls/duplicates
     const rawBusinesses = [...new Set(allProducts.map(p => p.business).filter(Boolean))];
-    
-    // Clean up list to ensure strict alignment (dropping rogue duplicates if any)
     const businesses = ['ALL', ...rawBusinesses.filter(b => b.toLowerCase() !== 'groceries' || b === 'Grocery')];
 
     const businessCircles = document.getElementById("business-circles");
     
-    // Local workspace image mapping (using clean lowercase keys for matching)
     const businessImages = {
-        'all': 'images/business/all.png',
+        'Grocery': 'images/business/grocery.png',
         'grocery': 'images/business/grocery.png',
-        'health & beauty': 'images/business/beauty.png',
-        'stationery': 'images/business/stationery.png',
-        'electronics': 'images/business/electronics.png'
+        'Health & Beauty': 'images/business/beauty.png',
+        'Stationery': 'images/business/stationery.png',
+        'Electronics': 'images/business/electronics.png'
     };
 
     if (businessCircles) {
         businessCircles.innerHTML = businesses.map((bus, idx) => {
-            const key = bus.toLowerCase();
-            const bgImg = businessImages[key] || businessImages['all'];
-            return `
-                <div class="circle-item ${idx === 0 ? 'active' : ''}" onclick="selectBusinessCircle('${bus}', this)">
-                    <div class="circle-icon" style="background-image: url('${bgImg}'); background-size: cover; background-position: center; border: 2px solid ${idx === 0 ? '#0baf65' : '#e2e8f0'};"></div>
-                    <span>${bus}</span>
-                </div>
-            `;
+            const isAll = bus === 'ALL';
+            const bgImg = businessImages[bus] || businessImages[bus.toLowerCase()];
+
+            if (isAll || !bgImg) {
+                return `
+                    <div class="circle-item ${idx === 0 ? 'active' : ''}" onclick="selectBusinessCircle('${bus}', this)">
+                        <div class="circle-icon" style="background: linear-gradient(135deg, #f7fafc, #edf2f7); border: 2px solid ${idx === 0 ? '#0baf65' : '#e2e8f0'}; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.03);">📦</div>
+                        <span>${bus}</span>
+                    </div>
+                `;
+            } else {
+                return `
+                    <div class="circle-item ${idx === 0 ? 'active' : ''}" onclick="selectBusinessCircle('${bus}', this)">
+                        <div class="circle-icon" style="background-image: url('${bgImg}'); background-size: cover; background-position: center; border: 2px solid ${idx === 0 ? '#0baf65' : '#e2e8f0'};"></div>
+                        <span>${bus}</span>
+                    </div>
+                `;
+            }
         }).join('');
     }
 
@@ -539,9 +543,7 @@ function selectSubcategoryCircle(subName, element) {
     applyFilters();
 }
 
-
-
-// 11. UNIVERSAL SEARCH & HIERARCHICAL FILTER ENGINE
+// 10. UNIVERSAL SEARCH & HIERARCHICAL FILTER ENGINE
 function applyFilters() {
     const activeBusinessEl = document.querySelector('#business-circles .circle-item.active span');
     const activeCategoryEl = document.querySelector('#category-circles .circle-item.active span');
@@ -612,7 +614,7 @@ function renderProducts(products) {
     }).join('');
 }
 
-// 12. QUANTITY BASKET & COMBO ENGINE
+// 11. QUANTITY BASKET & COMBO ENGINE
 function addToCart(product, event) {
     if (cart[product.id]) {
         cart[product.id].qty += 1;
@@ -678,7 +680,6 @@ function updateCartUI() {
         return sum + (parseFloat(p) * item.qty);
     }, 0);
 
-    // Update the quick-jump cart button badge count in the search bar
     const headerCartCountEl = document.getElementById("header-cart-count");
     if (headerCartCountEl) {
         headerCartCountEl.innerText = totalCount;
@@ -709,7 +710,7 @@ function updateCartUI() {
     }
 }
 
-// 13. CHECKOUT PREVIEW MODAL FLOW
+// 12. CHECKOUT PREVIEW MODAL FLOW
 function handleCheckout(event) {
     event.preventDefault();
 
@@ -843,7 +844,7 @@ async function executeFinalOrderSubmission() {
     }
 }
 
-// 14. SMART CUSTOM COMBO SAVER WITH DUPLICATE PREVENTION
+// 13. SMART CUSTOM COMBO SAVER WITH DUPLICATE PREVENTION
 async function saveCustomerCustomCombo(phone, items) {
     try {
         const signatureParts = items.map(i => `${i.product.id}:${i.qty}`).sort();
