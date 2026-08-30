@@ -800,8 +800,11 @@ async function executeFinalOrderSubmission() {
 
         if (orderError) throw new Error("Orders Table Error: " + orderError.message);
 
-        // 2. Automatically Save / Link Custom Customer Combo (Duplicate Prevented)
+                // 2. Automatically Save / Link Custom Customer Combo (Duplicate Prevented)
         await saveCustomerCustomCombo(contactPhone, items);
+
+        // 🟢 ADD THIS LINE HERE TO LOAD IT INSTANTLY
+        loadCustomerCustomCombos(contactPhone);
 
         localStorage.setItem("padesk_phone", contactPhone);
         localStorage.setItem("padesk_title", cTitle);
@@ -812,6 +815,7 @@ async function executeFinalOrderSubmission() {
         cart = {};
         updateCartUI();
         autoPopulateSavedCustomer();
+
         
         const displayOrderNo = newOrder && newOrder.order_number ? newOrder.order_number : "Successfully";
         alert(`Zikomo ${cTitle} ${cLastName || cFirstName}! Order ${displayOrderNo} has been placed via ${paymentMethod}. Your custom combo has been saved for easy reordering!`);
