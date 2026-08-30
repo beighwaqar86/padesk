@@ -41,6 +41,7 @@ function autoPopulateSavedCustomer() {
         if (document.getElementById("workplace-select") && savedOffice) document.getElementById("workplace-select").value = savedOffice;
 
         loadPastPurchases(savedPhone);
+        loadCustomerCustomCombos(savedPhone);
     } else {
         if (stateBar) {
             stateBar.style.display = "flex";
@@ -160,7 +161,7 @@ async function checkReturningCustomer(phone, isQuickLogin = false) {
     }
 }
 
-// 5. LOAD PAST PURCHASES SLIDER
+// 5. LOAD PAST PURCHASES SLIDER & CUSTOMER COMBOS
 async function loadPastPurchases(phone) {
     const { data: orders } = await db
         .from('orders')
@@ -194,6 +195,34 @@ async function loadPastPurchases(phone) {
                 <button onclick='addToCart(${JSON.stringify(p)}, event)' class="btn-add" style="padding:4px 8px; font-size:0.75rem;">+ Reorder</button>
             </div>
         `).join('');
+    }
+}
+
+async function loadCustomerCustomCombos(phone) {
+    const { data: combos } = await db.from('customer_combos').select('*').eq('customer_phone', phone);
+    if (!combos || combos.length === 0) return;
+
+    // You can inject custom combos into a dedicated UI section or merge into the banner carousel
+    const container = document.getElementById("banner-carousel");
+    if (container && combos.length > 0) {
+        combos.forEach(c => {
+            const encodedItems = encodeURIComponent(JSON.stringify(c.items_json));
+            const cardHTML = `
+                <div class="banner-card" style="background: linear-gradient(135deg, #0baf65, #088a4f); color: white;">
+                    <div class="banner-overlay" style="display: flex; justify-content: space-between; align-items: flex-end; background: none;">
+                        <div>
+                            <span style="background: rgba(0,0,0,0.3); color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.6rem; font-weight: bold; text-transform: uppercase;">⭐ My Custom Combo</span>
+                            <h4 style="margin: 4px 0 2px; font-size: 0.95rem;">${c.combo_name}</h4>
+                            <p style="margin: 0; font-size: 0.75rem; opacity: 0.95;">Saved Custom Office Bundle</p>
+                        </div>
+                        <button type="button" onclick="addBannerComboToCart('${encodedItems}', '${c.combo_name}')" class="btn-add-combo" style="background: white; color: #0baf65; border: none; padding: 8px 12px; border-radius: 8px; font-weight: 800; font-size: 0.75rem; cursor: pointer; white-space: nowrap;">
+                            + Reorder Combo
+                        </button>
+                    </div>
+                </div>
+            `;
+            container.insertAdjacentHTML('afterbegin', cardHTML);
+        });
     }
 }
 
@@ -757,6 +786,7 @@ async function executeFinalOrderSubmission() {
 
         if (custError) throw new Error("Customers Table Error: " + custError.message);
 
+        // 1. Insert Order
         const { data: newOrder, error: orderError } = await db.from('orders').insert([{
             customer_phone: contactPhone,
             delivery_location: selectedOffice,
@@ -770,6 +800,9 @@ async function executeFinalOrderSubmission() {
 
         if (orderError) throw new Error("Orders Table Error: " + orderError.message);
 
+        // 2. Automatically Save / Link Custom Customer Combo (Duplicate Prevented)
+        await saveCustomerCustomCombo(contactPhone, items);
+
         localStorage.setItem("padesk_phone", contactPhone);
         localStorage.setItem("padesk_title", cTitle);
         localStorage.setItem("padesk_first_name", cFirstName);
@@ -781,11 +814,46 @@ async function executeFinalOrderSubmission() {
         autoPopulateSavedCustomer();
         
         const displayOrderNo = newOrder && newOrder.order_number ? newOrder.order_number : "Successfully";
-        alert(`Zikomo ${cTitle} ${cLastName || cFirstName}! Order ${displayOrderNo} has been placed via ${paymentMethod}.`);
+        alert(`Zikomo ${cTitle} ${cLastName || cFirstName}! Order ${displayOrderNo} has been placed via ${paymentMethod}. Your custom combo has been saved for easy reordering!`);
 
     } catch (error) {
         console.error(error);
         alert("Action Failed:\n" + error.message);
         updateCartUI();
+    }
+}
+
+// 14. SMART CUSTOM COMBO SAVER WITH DUPLICATE PREVENTION
+async function saveCustomerCustomCombo(phone, items) {
+    try {
+        // Create a unique sorted signature based on product IDs and quantities (e.g., "1:1,5:2")
+        const signatureParts = items.map(i => `${i.product.id}:${i.qty}`).sort();
+        const productSignature = signatureParts.join(',');
+
+        // Check if this exact combo signature already exists for this phone number
+        const { data: existingCombos } = await db
+            .from('customer_combos')
+            .select('id')
+            .eq('customer_phone', phone)
+            .eq('product_signature', productSignature);
+
+        if (existingCombos && existingCombos.length > 0) {
+            return; // Already saved, skip duplicate creation
+        }
+
+        // Generate smart auto-name based on main brands/categories
+        const topBrands = [...new Set(items.map(i => i.product.brand).filter(Boolean))];
+        const comboName = topBrands.length > 0 
+            ? `${topBrands.slice(0, 2).join(' & ')} Office Bundle` 
+            : `Custom Office Combo #${Math.floor(Math.random() * 900) + 100}`;
+
+        await db.from('customer_combos').insert([{
+            customer_phone: phone,
+            combo_name: comboName,
+            items_json: items,
+            product_signature: productSignature
+        }]);
+    } catch (err) {
+        console.error("Error saving custom combo template:", err);
     }
 }
