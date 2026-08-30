@@ -409,7 +409,7 @@ async function loadProducts() {
     renderProducts(allProducts);
 }
 
-// 9. HIERARCHICAL DRILL-DOWN FILTERS (LOCAL WORKSPACE IMAGES & FALLBACK GRAPHIC FOR 'ALL')
+// 9. HIERARCHICAL DRILL-DOWN FILTERS (LOCAL WORKSPACE IMAGES FOR BUSINESS & CATEGORY)
 function buildDynamicMasterFilters() {
     const rawBusinesses = [...new Set(allProducts.map(p => p.business).filter(Boolean))];
     const businesses = ['ALL', ...rawBusinesses.filter(b => b.toLowerCase() !== 'groceries' || b === 'Grocery')];
@@ -474,14 +474,36 @@ function selectBusinessCircle(businessName, element) {
         const busProducts = allProducts.filter(p => p.business === businessName);
         const categories = ['ALL', ...new Set(busProducts.map(p => p.category).filter(Boolean))];
 
+        // Local workspace image mapping for categories (e.g., images/category/food.png)
+        const categoryImages = {
+            'Food': 'images/category/food.png',
+            'Home Care': 'images/category/home-care.png',
+            'School': 'images/category/school.png'
+        };
+
         if (categories.length > 1) {
             catCirclesContainer.style.display = 'flex';
-            catCirclesContainer.innerHTML = categories.map((cat, idx) => `
-                <div class="circle-item ${idx === 0 ? 'active' : ''}" onclick="selectCategoryCircle('${businessName}', '${cat}', this)">
-                    <div class="circle-icon" style="width:48px; height:48px; background: linear-gradient(135deg, #f7fafc, #edf2f7); border: 2px solid ${idx === 0 ? '#0baf65' : '#cbd5e0'}; display: flex; align-items: center; justify-content: center; font-size: 1.1rem;">📦</div>
-                    <span style="font-size:0.68rem;">${cat}</span>
-                </div>
-            `).join('');
+            catCirclesContainer.innerHTML = categories.map((cat, idx) => {
+                const isAll = cat === 'ALL';
+                const catKey = cat;
+                const catImg = categoryImages[catKey];
+
+                if (isAll || !catImg) {
+                    return `
+                        <div class="circle-item ${idx === 0 ? 'active' : ''}" onclick="selectCategoryCircle('${businessName}', '${cat}', this)">
+                            <div class="circle-icon" style="width:48px; height:48px; background: linear-gradient(135deg, #f7fafc, #edf2f7); border: 2px solid ${idx === 0 ? '#0baf65' : '#cbd5e0'}; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.03);">📦</div>
+                            <span style="font-size:0.68rem;">${cat}</span>
+                        </div>
+                    `;
+                } else {
+                    return `
+                        <div class="circle-item ${idx === 0 ? 'active' : ''}" onclick="selectCategoryCircle('${businessName}', '${cat}', this)">
+                            <div class="circle-icon" style="width:48px; height:48px; background-image: url('${catImg}'); background-size: cover; background-position: center; border: 2px solid ${idx === 0 ? '#0baf65' : '#cbd5e0'}; box-shadow: 0 2px 4px rgba(0,0,0,0.03);"></div>
+                            <span style="font-size:0.68rem;">${cat}</span>
+                        </div>
+                    `;
+                }
+            }).join('');
         } else {
             catCirclesContainer.style.display = 'none';
         }
