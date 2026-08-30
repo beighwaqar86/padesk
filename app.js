@@ -14,6 +14,14 @@ window.onload = function() {
     autoPopulateSavedCustomer();
 };
 
+// Scroll to cart selection section when header cart graphic is clicked
+function scrollToCartSection() {
+    const cartSection = document.getElementById("cart-section");
+    if (cartSection) {
+        cartSection.scrollIntoView({ behavior: 'smooth' });
+    }
+}
+
 // 1. AUTO-POPULATE & STATE BAR ENGINE
 function autoPopulateSavedCustomer() {
     const savedPhone = localStorage.getItem("padesk_phone");
@@ -293,18 +301,7 @@ async function loadAccountHistory(phone) {
     }
 }
 
-// 7. SIDEBAR DRAWER TOGGLE LOGIC
-function toggleSidebar() {
-    const sidebar = document.getElementById("filter-sidebar");
-    const overlay = document.getElementById("filter-sidebar-overlay");
-    if (sidebar && overlay) {
-        const isOpen = sidebar.classList.contains("open");
-        sidebar.classList.toggle("open");
-        overlay.style.display = isOpen ? "none" : "block";
-    }
-}
-
-// 8. READY-MADE ADMIN COMBO BANNERS SLIDER
+// 8. READY-MADE ADMIN COMBO BANNERS SLIDER (+ Add Combo positioned on top right corner)
 async function loadBanners() {
     const { data: banners } = await db.from('banners').select('*').eq('is_active', true);
     if (!banners || banners.length === 0) return;
@@ -318,18 +315,16 @@ async function loadBanners() {
             const comboTitle = b.title || 'Combo';
 
             return `
-                <div class="banner-card" style="background-image: url('${b.image_url}');">
-                    <div class="banner-overlay" style="display: flex; justify-content: space-between; align-items: flex-end;">
-                        <div>
-                            <span style="background: #0baf65; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.6rem; font-weight: bold; text-transform: uppercase;">Ready Combo</span>
-                            <h4 style="margin: 4px 0 2px; font-size: 0.95rem;">${b.title || ''}</h4>
-                            <p style="margin: 0; font-size: 0.75rem; opacity: 0.95;">${b.subtitle || ''}</p>
-                        </div>
-                        ${b.items_json ? `
-                            <button type="button" onclick="addBannerComboToCart('${encodedItems}', '${comboTitle}')" class="btn-add-combo" style="background: #0baf65; color: white; border: none; padding: 8px 12px; border-radius: 8px; font-weight: 800; font-size: 0.75rem; cursor: pointer; white-space: nowrap; box-shadow: 0 2px 6px rgba(0,0,0,0.2);">
-                                + Add Combo
-                            </button>
-                        ` : ''}
+                <div class="banner-card" style="background-image: url('${b.image_url}'); position: relative;">
+                    ${b.items_json ? `
+                        <button type="button" onclick="addBannerComboToCart('${encodedItems}', '${comboTitle}')" class="btn-add-combo" style="position: absolute; top: 10px; right: 10px; background: #0baf65; color: white; border: none; padding: 6px 12px; border-radius: 8px; font-weight: 800; font-size: 0.75rem; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.3); z-index: 5;">
+                            + Add Combo
+                        </button>
+                    ` : ''}
+                    <div class="banner-overlay" style="display: flex; flex-direction: column; justify-content: flex-end; align-items: flex-start;">
+                        <span style="background: #0baf65; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.6rem; font-weight: bold; text-transform: uppercase; margin-bottom: 4px;">Ready Combo</span>
+                        <h4 style="margin: 0 0 2px; font-size: 0.95rem;">${b.title || ''}</h4>
+                        <p style="margin: 0; font-size: 0.75rem; opacity: 0.95;">${b.subtitle || ''}</p>
                     </div>
                 </div>
             `;
@@ -416,12 +411,6 @@ async function loadProducts() {
 
 // 10. HIERARCHICAL DRILL-DOWN FILTERS (BUSINESS -> CATEGORY -> SUBCATEGORY)
 function buildDynamicMasterFilters() {
-    const categories = ['ALL', ...new Set(allProducts.map(p => p.category).filter(Boolean))];
-    const categorySelect = document.getElementById("filter-category");
-    if (categorySelect) {
-        categorySelect.innerHTML = categories.map(c => `<option value="${c}">${c}</option>`).join('');
-    }
-
     const businesses = ['ALL', ...new Set(allProducts.map(p => p.business).filter(Boolean))];
     const businessCircles = document.getElementById("business-circles");
     
@@ -504,29 +493,6 @@ function selectSubcategoryCircle(subName, element) {
     applyFilters();
 }
 
-function handleCategoryChange() {
-    const categorySelect = document.getElementById("filter-category");
-    const selectedCategory = categorySelect ? categorySelect.value : 'ALL';
-
-    const filteredForSub = selectedCategory === 'ALL' 
-        ? allProducts 
-        : allProducts.filter(p => p.category === selectedCategory);
-
-    const subcategories = ['ALL', ...new Set(filteredForSub.map(p => p.sub_category).filter(Boolean))];
-    const subSelect = document.getElementById("filter-subcategory");
-    if (subSelect) {
-        subSelect.innerHTML = subcategories.map(s => `<option value="${s}">${s}</option>`).join('');
-    }
-
-    const brands = ['ALL', ...new Set(filteredForSub.map(p => p.brand).filter(Boolean))];
-    const brandSelect = document.getElementById("filter-brand");
-    if (brandSelect) {
-        brandSelect.innerHTML = brands.map(b => `<option value="${b}">${b}</option>`).join('');
-    }
-
-    applyFilters();
-}
-
 // 11. UNIVERSAL SEARCH & HIERARCHICAL FILTER ENGINE
 function applyFilters() {
     const activeBusinessEl = document.querySelector('#business-circles .circle-item.active span');
@@ -537,9 +503,6 @@ function applyFilters() {
     const selectedCategory = activeCategoryEl ? activeCategoryEl.innerText : 'ALL';
     const selectedSubcategory = activeSubcategoryEl ? activeSubcategoryEl.innerText : 'ALL';
 
-    const sidebarCat = document.getElementById("filter-category")?.value || 'ALL';
-    const sidebarSub = document.getElementById("filter-subcategory")?.value || 'ALL';
-    const sidebarBrand = document.getElementById("filter-brand")?.value || 'ALL';
     const searchQuery = (document.getElementById("search-input")?.value || "").toLowerCase().trim();
 
     let filtered = allProducts;
@@ -557,10 +520,6 @@ function applyFilters() {
     if (subContainer && subContainer.style.display !== 'none' && selectedSubcategory !== 'ALL') {
         filtered = filtered.filter(p => p.sub_category === selectedSubcategory);
     }
-
-    if (sidebarCat !== 'ALL') filtered = filtered.filter(p => p.category === sidebarCat);
-    if (sidebarSub !== 'ALL') filtered = filtered.filter(p => p.sub_category === sidebarSub);
-    if (sidebarBrand !== 'ALL') filtered = filtered.filter(p => p.brand === sidebarBrand);
 
     if (searchQuery !== "") {
         filtered = filtered.filter(p => 
@@ -670,6 +629,12 @@ function updateCartUI() {
         const p = item.product.deal_price ? item.product.deal_price : item.product.price;
         return sum + (parseFloat(p) * item.qty);
     }, 0);
+
+    // Update the quick-jump cart button badge count in the search bar
+    const headerCartCountEl = document.getElementById("header-cart-count");
+    if (headerCartCountEl) {
+        headerCartCountEl.innerText = totalCount;
+    }
 
     const countRuleEl = document.getElementById("item-count-rule");
     const priceRuleEl = document.getElementById("price-rule");
