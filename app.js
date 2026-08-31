@@ -412,7 +412,7 @@ async function loadStockHoldings() {
 }
 
 // --- BI ANALYTICS DASHBOARD ---
-/// --- BI ANALYTICS DASHBOARD ---
+// --- BI ANALYTICS DASHBOARD ---
 async function loadBIDashboard() {
     try {
         const { data: orders, error: orderErr } = await db.from('orders').select('total_amount, order_items_json');
@@ -516,6 +516,46 @@ async function loadPnLReport() {
         console.error("Error loading P&L:", err);
     }
 }
+
+// --- PROFIT & LOSS REPORT ---
+async function loadPnLReport() {
+    try {
+        const { data: orders, error } = await db.from('orders').select('total_amount, order_items_json').eq('fulfillment_status', 'Delivered');
+        if (error) throw error;
+
+        let totalRevenue = 0;
+        let totalCOGS = 0;
+
+        if (orders) {
+            orders.forEach(o => {
+                totalRevenue += parseFloat(o.total_amount || 0);
+                
+                const items = o.order_items_json || [];
+                items.forEach(item => {
+                    const historicalCost = parseFloat(item.product.cost_price || 0);
+                    const qty = item.qty || 1;
+                    totalCOGS += (historicalCost * qty);
+                });
+            });
+        }
+
+        const grossProfit = totalRevenue - totalCOGS;
+        const grossMarginPct = totalRevenue > 0 ? ((grossProfit / totalRevenue) * 100) : 0;
+
+        document.getElementById('pnl-revenue').innerText = `K ${totalRevenue.toFixed(2)}`;
+        document.getElementById('pnl-cogs').innerText = `(K ${totalCOGS.toFixed(2)})`;
+        
+        const profitEl = document.getElementById('pnl-profit');
+        profitEl.innerText = `K ${grossProfit.toFixed(2)}`;
+        profitEl.style.color = grossProfit >= 0 ? '#0baf65' : '#e53e3e';
+
+        document.getElementById('pnl-margin').innerText = `${grossMarginPct.toFixed(2)}%`;
+
+    } catch (err) {
+        console.error("Error loading P&L:", err);
+    }
+}
+
 // --- BANNERS ---
 async function loadAdminBanners() {
     const { data } = await db.from('banners').select('*').order('id', { ascending: false });
