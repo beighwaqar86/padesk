@@ -240,6 +240,45 @@ async function loadCustomerCustomCombos(phone) {
 
 // 6. ACCOUNT DETAILS DRAWER TOGGLE & HISTORY FETCH
 
+function toggleAccountDrawer() {
+    const drawer = document.getElementById("account-drawer");
+    const overlay = document.getElementById("account-drawer-overlay");
+    if (drawer && overlay) {
+        const isOpen = drawer.classList.contains("open");
+        drawer.classList.toggle("open");
+        overlay.style.display = isOpen ? "none" : "block";
+
+        const savedPhone = localStorage.getItem("padesk_phone");
+        if (!isOpen) {
+            if (savedPhone) {
+                loadAccountHistory(savedPhone);
+            } else {
+                resetAccountDrawerUI();
+            }
+        }
+    }
+}
+
+function resetAccountDrawerUI() {
+    const profileBox = document.getElementById("account-profile-info");
+    const historyList = document.getElementById("account-order-history");
+    const signOutBtn = document.getElementById("drawer-signout-btn");
+
+    if (profileBox) {
+        profileBox.innerHTML = `
+            <p style="margin:0;"><small>You are currently browsing as a <strong>Guest</strong>.</small></p>
+            <small style="color:#718096;">Enter your mobile number at checkout or in the top bar to load your account profile.</small>
+        `;
+    }
+    if (historyList) {
+        historyList.style.cssText = "border: none; background: transparent; box-shadow: none;";
+        historyList.innerHTML = "<p style='color:#718096; font-size:0.85rem;'><small>No active session found.</small></p>";
+    }
+    if (signOutBtn) {
+        signOutBtn.style.display = "none";
+    }
+}
+
 // Attach toggle function directly to window so it fires correctly from inline HTML
 window.toggleCustomerOrderDetails = function(orderId) {
     const detailBox = document.getElementById(`cust-order-details-${orderId}`);
@@ -358,7 +397,6 @@ async function loadAccountHistory(phone) {
 
     } catch (err) {
         console.error("Failed to load history:", err);
-        // If Supabase RLS is blocking the query, show this error visibly instead of failing silently.
         historyList.innerHTML = `
             <div style="padding: 15px; color: #e53e3e; background: #fff5f5; border: 1px solid #feb2b2; border-radius: 8px; font-size: 0.8rem; text-align: left;">
                 <strong>⚠️ Could not load history.</strong><br>
