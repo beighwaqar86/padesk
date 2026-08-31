@@ -7,20 +7,31 @@ window.onload = function() {
     loadAdminProducts();
     loadAdminBanners();
     loadAdminOrders();
+    loadPurchaseProductDropdown();
 };
 
-function switchTab(tabName, event) {
-    document.querySelectorAll('.admin-section').forEach(el => el.classList.remove('active'));
-    document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
-    document.getElementById(`section-${tabName}`).classList.add('active');
-    event.target.classList.add('active');
+function switchAdminTab(tabName) {
+    document.querySelectorAll('.admin-tab-content').forEach(el => el.style.display = 'none');
+    document.querySelectorAll('[id^="tab-btn-"]').forEach(btn => {
+        btn.style.background = '#edf2f7';
+        btn.style.color = '#4a5568';
+    });
+
+    const targetTab = document.getElementById(`admin-tab-${tabName}`);
+    const targetBtn = document.getElementById(`tab-btn-${tabName}`);
+
+    if (targetTab) targetTab.style.display = 'block';
+    if (targetBtn) {
+        targetBtn.style.background = '#0baf65';
+        targetBtn.style.color = 'white';
+    }
 }
 
 // --- PRODUCTS CRUD ---
 async function loadAdminProducts() {
     const { data } = await db.from('products').select('*').order('id', { ascending: false });
     const tbody = document.getElementById("admin-product-table");
-    if (!data) return;
+    if (!data || !tbody) return;
     tbody.innerHTML = data.map(p => `
         <tr style="border-bottom:1px solid #edf2f7;">
             <td style="padding:8px;">${p.product_code || '-'}</td>
@@ -35,58 +46,88 @@ async function loadAdminProducts() {
     `).join('');
 }
 
-async function saveProduct(e) {
-    e.preventDefault();
-    const id = document.getElementById("product-id").value;
-    const payload = {
-        name: document.getElementById("p-name").value.trim(),
-        product_code: document.getElementById("p-code").value.trim() || null,
-        business: document.getElementById("p-business").value,
-        category: document.getElementById("p-category").value.trim(),
-        sub_category: document.getElementById("p-subcategory").value.trim() || null,
-        price: parseFloat(document.getElementById("p-price").value),
-        deal_price: document.getElementById("p-deal-price").value ? parseFloat(document.getElementById("p-deal-price").value) : null,
-        brand: document.getElementById("p-brand").value.trim() || null,
-        image_url: document.getElementById("p-image").value.trim() || null,
-        is_active: document.getElementById("p-active").checked
-    };
-    const query = id ? db.from('products').update(payload).eq('id', id) : db.from('products').insert([payload]);
-    const { error } = await query;
-    if (error) alert("Error: " + error.message);
-    else { alert("Saved!"); resetProductForm(); loadAdminProducts(); }
-}
-
-function editProduct(p) {
-    document.getElementById("product-id").value = p.id;
-    document.getElementById("p-name").value = p.name;
-    document.getElementById("p-code").value = p.product_code || '';
-    document.getElementById("p-business").value = p.business || '';
-    document.getElementById("p-category").value = p.category || '';
-    document.getElementById("p-subcategory").value = p.sub_category || '';
-    document.getElementById("p-price").value = p.price;
-    document.getElementById("p-deal-price").value = p.deal_price || '';
-    document.getElementById("p-brand").value = p.brand || '';
-    document.getElementById("p-image").value = p.image_url || '';
-    document.getElementById("p-active").checked = p.is_active;
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-
 async function deleteProduct(id) {
     if (!confirm("Delete product?")) return;
     await db.from('products').delete().eq('id', id);
     loadAdminProducts();
+    loadPurchaseProductDropdown();
 }
 
-function resetProductForm() {
-    document.getElementById("admin-product-form").reset();
-    document.getElementById("product-id").value = "";
+// --- PURCHASES MODULE ---
+async function loadPurchaseProductDropdown() {
+    const selectEl = document.getElementById("purchase-product-select");
+    if (!selectEl) return;
+
+    try {
+        const { data: products, error } = await db.from('products').select('id, name, product_code, cost_price').order('name');
+        if (error) throw error;
+
+        selectEl.innerHTML = '<option value="">-- Choose Product --</option>' + (products || []).map(p => `
+            <option value="${p.id}">${p.name} (Code: ${p.product_code || '-'} | Current Cost: K ${parseFloat(p.cost_price || 0).toFixed(2)})</option>
+        `).join('');
+    } catch (err) {
+        console.error("Error loading product dropdown:", err);
+    }
+}
+
+async function recordPurchase(event) {
+    event.preventDefault();
+    
+    const productId = document.getElementById("purchase-product-select").value;
+    const qty = parseInt(document.getElementById("purchase-qty").value);
+    const unitCost = parseFloat(document.getElementById("purchase-unit-cost").value);
+    const supplier = document.getElementById("purchase-supplier").value.trim();
+    const invoiceRef = document.getElementById("purchase-invoice").value.trim();
+
+    if (!productId || !qty || !unitCost || !supplier) {
+        return alert("Please fill in all required purchase details.");
+    }
+
+    try {
+        const { data: prod, error: fetchErr } = await db.from('products').select('*').eq('id', productId).single();
+        if (fetchErr) throw fetchErr;
+
+        const currentSellingPrice = parseFloat(prod.deal_price || prod.price);
+        
+        if (unitCost > currentSellingPrice) {
+            const confirmOverride = confirm(`⚠️ FINANCIAL ALERT: Purchase unit cost (K ${unitCost.toFixed(2)}) is HIGHER than the current selling price (K ${currentSellingPrice.toFixed(2)})! This will result in an immediate loss. Do you still want to proceed?`);
+            if (!confirmOverride) return;
+        }
+
+        const { error: purchaseErr } = await db.from('purchases').insert([{
+            supplier_name: supplier,
+            invoice_ref: invoiceRef,
+            product_id: parseInt(productId),
+            qty_received: qty,
+            purchase_unit_cost: unitCost,
+            recorded_by: 'Admin'
+        }]);
+        if (purchaseErr) throw purchaseErr;
+
+        const newStock = (prod.stock_qty || 0) + qty;
+        const { error: updateErr } = await db.from('products').update({
+            stock_qty: newStock,
+            cost_price: unitCost
+        }).eq('id', productId);
+
+        if (updateErr) throw updateErr;
+
+        alert("✅ Purchase recorded successfully! Stock and acquisition cost updated.");
+        document.getElementById("purchase-form").reset();
+        loadAdminProducts();
+        loadPurchaseProductDropdown();
+
+    } catch (err) {
+        console.error("Purchase error:", err);
+        alert("Failed to record purchase: " + err.message);
+    }
 }
 
 // --- BANNERS CRUD ---
 async function loadAdminBanners() {
     const { data } = await db.from('banners').select('*').order('id', { ascending: false });
     const container = document.getElementById("admin-banners-list");
-    if (!data) return;
+    if (!data || !container) return;
     container.innerHTML = data.map(b => `
         <div style="border:1px solid #e2e8f0; padding:10px; border-radius:8px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
             <div>
@@ -97,37 +138,12 @@ async function loadAdminBanners() {
     `).join('');
 }
 
-async function saveBanner(e) {
-    e.preventDefault();
-    let parsedItems = null;
-    try {
-        const rawJson = document.getElementById("b-items-json").value.trim();
-        if (rawJson) parsedItems = JSON.parse(rawJson);
-    } catch (err) {
-        return alert("Invalid JSON format in Items JSON field!");
-    }
-
-    const payload = {
-        title: document.getElementById("b-title").value.trim(),
-        subtitle: document.getElementById("b-subtitle").value.trim(),
-        image_url: document.getElementById("b-image").value.trim(),
-        items_json: parsedItems,
-        is_active: document.getElementById("b-active").checked
-    };
-
-    const { error } = await db.from('banners').insert([payload]);
-    if (error) alert("Error: " + error.message);
-    else { alert("Banner Combo added!"); document.getElementById("admin-banner-form").reset(); loadAdminBanners(); }
-}
-
 async function deleteBanner(id) {
     await db.from('banners').delete().eq('id', id);
     loadAdminBanners();
 }
 
-function resetBannerForm() { document.getElementById("admin-banner-form").reset(); }
-
-// --- FULFILLMENT ORDERS (WITH CUSTOMER JOIN & CENTERED EXPANSION) ---
+// --- FULFILLMENT ORDERS ---
 async function loadAdminOrders() {
     const { data: orders } = await db.from('orders').select('*').order('id', { ascending: false });
     const { data: customers } = await db.from('customers').select('*');
@@ -138,13 +154,12 @@ async function loadAdminOrders() {
     }
 
     const tbody = document.getElementById("admin-orders-table");
-    if (!orders) return;
+    if (!orders || !tbody) return;
 
     tbody.innerHTML = orders.map(o => {
         const orderDate = o.created_at ? new Date(o.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-';
         const orderNum = o.order_number || (`#ORD-${o.id}`);
         
-        // Match customer details from the customers table via phone number
         const cust = customerMap[o.customer_phone] || {};
         const title = cust.title || '';
         const firstName = cust.first_name || '';
@@ -173,7 +188,7 @@ async function loadAdminOrders() {
                 </td>
                 <td style="padding:10px;">
                     <div style="display: flex; align-items: center; gap: 6px;">
-                        <select id="status-${o.id}" class="form-input" style="padding: 4px; font-size: 0.75rem;">
+                        <select id="status-${o.id}" style="padding: 4px; font-size: 0.75rem;">
                             <option value="Order Placed" ${o.fulfillment_status === 'Order Placed' ? 'selected' : ''}>Order Placed</option>
                             <option value="Aggregating" ${o.fulfillment_status === 'Aggregating' ? 'selected' : ''}>Aggregating</option>
                             <option value="Dispatched" ${o.fulfillment_status === 'Dispatched' ? 'selected' : ''}>Dispatched</option>
@@ -186,7 +201,6 @@ async function loadAdminOrders() {
                     </div>
                 </td>
             </tr>
-            <!-- Centered Collapsible Details Row -->
             <tr id="details-row-${o.id}" style="display: none; background: #f8fafc; border-bottom: 2px solid #e2e8f0;">
                 <td colspan="6" style="padding: 14px; text-align: center;">
                     <div style="background: white; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; max-width: 650px; margin: 0 auto; text-align: left;">
@@ -238,7 +252,6 @@ async function updateFulfillmentStatus(orderId) {
 
     const newStatus = selectEl.value;
     
-    // Explicitly target and update the order record in Supabase
     const { data, error } = await db
         .from('orders')
         .update({ fulfillment_status: newStatus })
@@ -247,113 +260,10 @@ async function updateFulfillmentStatus(orderId) {
     
     if (error) {
         alert("Database Error: " + error.message);
-        console.error("Supabase update error:", error);
     } else if (!data || data.length === 0) {
         alert("Update blocked! Check your Supabase RLS policies for the 'orders' table.");
     } else {
         alert(`Order #${orderId} fulfillment status updated to "${newStatus}" successfully!`);
         loadAdminOrders();
     }
-    // 1. RECORD A NEW PURCHASE (Stock Intake & Cost Update)
-async function recordPurchase(event) {
-    event.preventDefault();
-    
-    const productId = document.getElementById("purchase-product-select").value;
-    const qty = parseInt(document.getElementById("purchase-qty").value);
-    const unitCost = parseFloat(document.getElementById("purchase-unit-cost").value);
-    const supplier = document.getElementById("purchase-supplier").value.trim();
-    const invoiceRef = document.getElementById("purchase-invoice").value.trim();
-
-    if (!productId || !qty || !unitCost || !supplier) {
-        return alert("Please fill in all required purchase details.");
-    }
-
-    try {
-        // Fetch current product to check margins and stock
-        const { data: prod, error: fetchErr } = await db.from('products').select('*').eq('id', productId).single();
-        if (fetchErr) throw fetchErr;
-
-        const currentSellingPrice = parseFloat(prod.deal_price || prod.price);
-        
-        // Finance Guardrail: Check if new unit cost exceeds selling price
-        if (unitCost > currentSellingPrice) {
-            const confirmOverride = confirm(`⚠️ FINANCIAL ALERT: Purchase unit cost (K ${unitCost.toFixed(2)}) is HIGHER than the current selling price (K ${currentSellingPrice.toFixed(2)})! This will result in an immediate loss. Do you still want to proceed?`);
-            if (!confirmOverride) return;
-        }
-
-        // 1. Insert Purchase Record
-        const { error: purchaseErr } = await db.from('purchases').insert([{
-            supplier_name: supplier,
-            invoice_ref: invoiceRef,
-            product_id: parseInt(productId),
-            qty_received: qty,
-            purchase_unit_cost: unitCost,
-            recorded_by: 'Admin'
-        }]);
-        if (purchaseErr) throw purchaseErr;
-
-        // 2. Update Product Stock and Cost Price
-        const newStock = (prod.stock_qty || 0) + qty;
-        const { error: updateErr } = await db.from('products').update({
-            stock_qty: newStock,
-            cost_price: unitCost
-        }).eq('id', productId);
-
-        if (updateErr) throw updateErr;
-
-        alert("✅ Purchase recorded successfully! Stock and acquisition cost updated.");
-        // Reload admin inventory views
-        loadAdminInventory();
-
-    } catch (err) {
-        console.error("Purchase error:", err);
-        alert("Failed to record purchase: " + err.message);
-    }
-}
-
-// 2. RECORD AN OPERATIONAL EXPENSE (OpEx)
-async function recordExpense(event) {
-    event.preventDefault();
-    
-    const category = document.getElementById("expense-category").value;
-    const amount = parseFloat(document.getElementById("expense-amount").value);
-    const description = document.getElementById("expense-desc").value.trim();
-
-    if (!category || isNaN(amount)) {
-        return alert("Please enter a valid category and amount.");
-    }
-
-    try {
-        const { error } = await db.from('expenses').insert([{
-            category: category,
-            amount: amount,
-            description: description,
-            recorded_by: 'Admin'
-        }]);
-
-        if (error) throw error;
-
-        alert("✅ Expense recorded successfully for P&L tracking.");
-        document.getElementById("expense-amount").value = "";
-        document.getElementById("expense-desc").value = "";
-    } catch (err) {
-        console.error("Expense error:", err);
-        alert("Failed to record expense: " + err.message);
-    }
-}
-    async function loadPurchaseProductDropdown() {
-    const selectEl = document.getElementById("purchase-product-select");
-    if (!selectEl) return;
-
-    try {
-        const { data: products, error } = await db.from('products').select('id, name, product_code, cost_price').order('name');
-        if (error) throw error;
-
-        selectEl.innerHTML = '<option value="">-- Choose Product --</option>' + products.map(p => `
-            <option value="${p.id}">${p.name} (Code: ${p.product_code || '-'} | Current Cost: K ${parseFloat(p.cost_price || 0).toFixed(2)})</option>
-        `).join('');
-    } catch (err) {
-        console.error("Error loading product dropdown:", err);
-    }
-}
 }
