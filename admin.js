@@ -254,4 +254,91 @@ async function updateFulfillmentStatus(orderId) {
         alert(`Order #${orderId} fulfillment status updated to "${newStatus}" successfully!`);
         loadAdminOrders();
     }
+    // 1. RECORD A NEW PURCHASE (Stock Intake & Cost Update)
+async function recordPurchase(event) {
+    event.preventDefault();
+    
+    const productId = document.getElementById("purchase-product-select").value;
+    const qty = parseInt(document.getElementById("purchase-qty").value);
+    const unitCost = parseFloat(document.getElementById("purchase-unit-cost").value);
+    const supplier = document.getElementById("purchase-supplier").value.trim();
+    const invoiceRef = document.getElementById("purchase-invoice").value.trim();
+
+    if (!productId || !qty || !unitCost || !supplier) {
+        return alert("Please fill in all required purchase details.");
+    }
+
+    try {
+        // Fetch current product to check margins and stock
+        const { data: prod, error: fetchErr } = await db.from('products').select('*').eq('id', productId).single();
+        if (fetchErr) throw fetchErr;
+
+        const currentSellingPrice = parseFloat(prod.deal_price || prod.price);
+        
+        // Finance Guardrail: Check if new unit cost exceeds selling price
+        if (unitCost > currentSellingPrice) {
+            const confirmOverride = confirm(`⚠️ FINANCIAL ALERT: Purchase unit cost (K ${unitCost.toFixed(2)}) is HIGHER than the current selling price (K ${currentSellingPrice.toFixed(2)})! This will result in an immediate loss. Do you still want to proceed?`);
+            if (!confirmOverride) return;
+        }
+
+        // 1. Insert Purchase Record
+        const { error: purchaseErr } = await db.from('purchases').insert([{
+            supplier_name: supplier,
+            invoice_ref: invoiceRef,
+            product_id: parseInt(productId),
+            qty_received: qty,
+            purchase_unit_cost: unitCost,
+            recorded_by: 'Admin'
+        }]);
+        if (purchaseErr) throw purchaseErr;
+
+        // 2. Update Product Stock and Cost Price
+        const newStock = (prod.stock_qty || 0) + qty;
+        const { error: updateErr } = await db.from('products').update({
+            stock_qty: newStock,
+            cost_price: unitCost
+        }).eq('id', productId);
+
+        if (updateErr) throw updateErr;
+
+        alert("✅ Purchase recorded successfully! Stock and acquisition cost updated.");
+        // Reload admin inventory views
+        loadAdminInventory();
+
+    } catch (err) {
+        console.error("Purchase error:", err);
+        alert("Failed to record purchase: " + err.message);
+    }
+}
+
+// 2. RECORD AN OPERATIONAL EXPENSE (OpEx)
+async function recordExpense(event) {
+    event.preventDefault();
+    
+    const category = document.getElementById("expense-category").value;
+    const amount = parseFloat(document.getElementById("expense-amount").value);
+    const description = document.getElementById("expense-desc").value.trim();
+
+    if (!category || isNaN(amount)) {
+        return alert("Please enter a valid category and amount.");
+    }
+
+    try {
+        const { error } = await db.from('expenses').insert([{
+            category: category,
+            amount: amount,
+            description: description,
+            recorded_by: 'Admin'
+        }]);
+
+        if (error) throw error;
+
+        alert("✅ Expense recorded successfully for P&L tracking.");
+        document.getElementById("expense-amount").value = "";
+        document.getElementById("expense-desc").value = "";
+    } catch (err) {
+        console.error("Expense error:", err);
+        alert("Failed to record expense: " + err.message);
+    }
+}
 }
