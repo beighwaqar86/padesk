@@ -111,32 +111,28 @@ body {
     background: white;
 }
 
-.banner-carousel {
+/* Container forces full-width snap behavior */
+#banner-carousel {
     display: flex;
-    gap: 12px;
     overflow-x: auto;
     scroll-snap-type: x mandatory;
     scroll-behavior: smooth;
-    padding-bottom: 8px;
-    -webkit-overflow-scrolling: touch;
+    gap: 0px; /* Remove gaps so each card fills 100% cleanly */
+    width: 100%;
+    scrollbar-width: none; /* Hide scrollbar for clean UI */
 }
 
-.banner-carousel::-webkit-scrollbar { display: none; }
+#banner-carousel::-webkit-scrollbar {
+    display: none;
+}
 
+/* Each slide takes 100% of the parent width */
 .banner-card {
-    min-width: 88%;
-    height: 145px;
-    border-radius: 14px;
-    background-size: cover;
-    background-position: center;
-    position: relative;
-    scroll-snap-align: center;
-    flex-shrink: 0;
-    display: flex;
-    align-items: flex-end;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    flex: 0 0 100% !important;
+    width: 100% !important;
+    scroll-snap-align: start;
+    box-sizing: border-box;
 }
-
 .banner-overlay {
     background: linear-gradient(transparent, rgba(0, 0, 0, 0.85));
     color: white;
