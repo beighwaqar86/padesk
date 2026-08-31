@@ -92,6 +92,31 @@ function editProductFromEncoded(encodedStr) {
     }
 }
 
+// Two-Way Smart Pricing Calculator
+function calculatePricing(source) {
+    const costInput = document.getElementById("p-cost-price");
+    const markupInput = document.getElementById("p-markup");
+    const priceInput = document.getElementById("p-price");
+
+    if (!costInput || !markupInput || !priceInput) return;
+
+    let cost = parseFloat(costInput.value) || 0;
+    let markup = parseFloat(markupInput.value) || 0;
+    let price = parseFloat(priceInput.value) || 0;
+
+    if (cost <= 0) return; // Need a cost base to calculate margins
+
+    if (source === 'markup' || source === 'cost') {
+        // Forward Calc: User changes Markup or Cost -> Calculate Selling Price
+        price = cost + (cost * (markup / 100));
+        priceInput.value = price.toFixed(2);
+    } else if (source === 'price') {
+        // Reverse Calc: User manually types Selling Price -> Calculate Markup
+        markup = ((price - cost) / cost) * 100;
+        markupInput.value = markup.toFixed(2);
+    }
+}
+
 async function saveProduct(e) {
     e.preventDefault();
     const id = document.getElementById("product-id").value;
@@ -101,6 +126,8 @@ async function saveProduct(e) {
         business: document.getElementById("p-business").value,
         category: document.getElementById("p-category").value.trim(),
         sub_category: document.getElementById("p-subcategory").value.trim() || null,
+        cost_price: parseFloat(document.getElementById("p-cost-price").value) || 0,
+        target_margin_pct: parseFloat(document.getElementById("p-markup").value) || 0,
         price: parseFloat(document.getElementById("p-price").value),
         deal_price: document.getElementById("p-deal-price").value ? parseFloat(document.getElementById("p-deal-price").value) : null,
         brand: document.getElementById("p-brand").value.trim() || null,
@@ -109,12 +136,17 @@ async function saveProduct(e) {
         is_active: document.getElementById("p-active").checked
     };
     
+    // Safety check: Don't sell below cost
+    if (payload.price < payload.cost_price) {
+        if (!confirm("⚠️ WARNING: Selling price is below Cost Price. Are you sure you want to save?")) return;
+    }
+
     const query = id ? db.from('products').update(payload).eq('id', id) : db.from('products').insert([payload]);
     const { error } = await query;
     if (error) {
         alert("Error: " + error.message);
     } else {
-        alert("Product saved successfully!");
+        alert(id ? "Product updated successfully!" : "Product created! Navigate to 'Stock Purchase' to receive initial inventory.");
         resetProductForm();
         loadAdminProducts();
         loadStockHoldings();
@@ -129,12 +161,26 @@ function editProduct(p) {
     document.getElementById("p-business").value = p.business || '';
     document.getElementById("p-category").value = p.category || '';
     document.getElementById("p-subcategory").value = p.sub_category || '';
+    
+    // Pricing Module Mapping and Locking
+    const costInput = document.getElementById("p-cost-price");
+    if (costInput) {
+        costInput.value = p.cost_price || 0;
+        costInput.readOnly = true; // Lock cost price on edit
+        costInput.style.background = "#edf2f7"; // Visually indicate it's locked
+    }
+    
+    const markupInput = document.getElementById("p-markup");
+    if (markupInput) markupInput.value = p.target_margin_pct || 0;
+
     document.getElementById("p-price").value = p.price;
     document.getElementById("p-deal-price").value = p.deal_price || '';
+    
     document.getElementById("p-brand").value = p.brand || '';
     document.getElementById("p-image").value = p.image_url || '';
     document.getElementById("p-sell-oos").value = p.sell_oos || 'N';
     document.getElementById("p-active").checked = p.is_active;
+    
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -149,6 +195,13 @@ async function deleteProduct(id) {
 function resetProductForm() {
     document.getElementById("admin-product-form").reset();
     document.getElementById("product-id").value = "";
+    
+    // Unlock cost price for new product entry
+    const costInput = document.getElementById("p-cost-price");
+    if (costInput) {
+        costInput.readOnly = false;
+        costInput.style.background = "#ffffff";
+    }
 }
 
 // --- PURCHASES MODULE ---
@@ -214,9 +267,19 @@ async function recordPurchase(event) {
         if (purchaseErr) throw purchaseErr;
 
         const newStock = (prod.stock_qty || 0) + qty;
+        
+        // Auto-recalculate target margin based on new unit cost and existing price
+        const currentPrice = parseFloat(prod.price || 0);
+        let newMarginPct = prod.target_margin_pct || 0;
+        
+        if (unitCost > 0) {
+            newMarginPct = ((currentPrice - unitCost) / unitCost) * 100;
+        }
+
         const { error: updateErr } = await db.from('products').update({
             stock_qty: newStock,
-            cost_price: unitCost
+            cost_price: unitCost,
+            target_margin_pct: newMarginPct
         }).eq('id', productId);
 
         if (updateErr) throw updateErr;
