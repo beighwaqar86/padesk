@@ -19,15 +19,60 @@
 
         <!-- Navigation Tabs -->
         <div style="display: flex; gap: 10px; margin-bottom: 24px; flex-wrap: wrap;">
-            <button type="button" onclick="switchAdminTab('products')" id="tab-btn-products" style="background: #0baf65; color: white; border: none; padding: 10px 16px; border-radius: 8px; font-weight: bold; cursor: pointer;">📦 Products Master</button>
+            <button type="button" onclick="switchAdminTab('dashboard')" id="tab-btn-dashboard" style="background: #0baf65; color: white; border: none; padding: 10px 16px; border-radius: 8px; font-weight: bold; cursor: pointer;">📈 BI Dashboard</button>
+            <button type="button" onclick="switchAdminTab('products')" id="tab-btn-products" style="background: #edf2f7; color: #4a5568; border: none; padding: 10px 16px; border-radius: 8px; font-weight: bold; cursor: pointer;">📦 Products Master</button>
             <button type="button" onclick="switchAdminTab('purchases')" id="tab-btn-purchases" style="background: #edf2f7; color: #4a5568; border: none; padding: 10px 16px; border-radius: 8px; font-weight: bold; cursor: pointer;">📥 Stock Purchase</button>
             <button type="button" onclick="switchAdminTab('stock')" id="tab-btn-stock" style="background: #edf2f7; color: #4a5568; border: none; padding: 10px 16px; border-radius: 8px; font-weight: bold; cursor: pointer;">📊 Stock on Hand</button>
+            <button type="button" onclick="switchAdminTab('pnl')" id="tab-btn-pnl" style="background: #edf2f7; color: #4a5568; border: none; padding: 10px 16px; border-radius: 8px; font-weight: bold; cursor: pointer;">💰 P&L Report</button>
             <button type="button" onclick="switchAdminTab('banners')" id="tab-btn-banners" style="background: #edf2f7; color: #4a5568; border: none; padding: 10px 16px; border-radius: 8px; font-weight: bold; cursor: pointer;">⚡ Ready-Made Combos</button>
             <button type="button" onclick="switchAdminTab('fulfillment')" id="tab-btn-fulfillment" style="background: #edf2f7; color: #4a5568; border: none; padding: 10px 16px; border-radius: 8px; font-weight: bold; cursor: pointer;">🚚 Order Fulfillment</button>
         </div>
 
+        <!-- TAB 0: BI DASHBOARD -->
+        <div id="admin-tab-dashboard" class="admin-tab-content" style="display: block;">
+            <h3 style="margin-top: 0; color: #1a202c;">Executive Performance Overview</h3>
+            
+            <!-- Metric Cards -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 24px;">
+                <div style="background: white; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0; border-left: 5px solid #3182ce;">
+                    <div style="color: #718096; font-size: 0.85rem; font-weight: bold; text-transform: uppercase;">Total Sales (All Time)</div>
+                    <div id="bi-total-sales" style="font-size: 1.8rem; font-weight: 800; color: #2d3748; margin-top: 8px;">K 0.00</div>
+                </div>
+                <div style="background: white; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0; border-left: 5px solid #0baf65;">
+                    <div style="color: #718096; font-size: 0.85rem; font-weight: bold; text-transform: uppercase;">Total Orders</div>
+                    <div id="bi-total-orders" style="font-size: 1.8rem; font-weight: 800; color: #2d3748; margin-top: 8px;">0</div>
+                </div>
+                <div style="background: white; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0; border-left: 5px solid #ed8936;">
+                    <div style="color: #718096; font-size: 0.85rem; font-weight: bold; text-transform: uppercase;">Avg. Order Value</div>
+                    <div id="bi-aov" style="font-size: 1.8rem; font-weight: 800; color: #2d3748; margin-top: 8px;">K 0.00</div>
+                </div>
+                <div style="background: white; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0; border-left: 5px solid #805ad5;">
+                    <div style="color: #718096; font-size: 0.85rem; font-weight: bold; text-transform: uppercase;">Registered Customers</div>
+                    <div id="bi-customers" style="font-size: 1.8rem; font-weight: 800; color: #2d3748; margin-top: 8px;">0</div>
+                </div>
+            </div>
+
+            <!-- Top Movers Table -->
+            <div style="background: white; padding: 20px; border-radius: 10px; border: 1px solid #e2e8f0;">
+                <h4 style="margin-top: 0; color: #2d3748;">🔥 Top 5 Best-Selling Products</h4>
+                <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem;">
+                    <thead>
+                        <tr style="background: #f7fafc; border-bottom: 2px solid #cbd5e0; color: #4a5568;">
+                            <th style="padding: 10px;">Product Name</th>
+                            <th style="padding: 10px;">Brand</th>
+                            <th style="padding: 10px; text-align: center;">Units Sold</th>
+                            <th style="padding: 10px; text-align: right;">Revenue Generated</th>
+                        </tr>
+                    </thead>
+                    <tbody id="bi-top-products">
+                        <tr><td colspan="4" style="padding: 15px; text-align: center; color: #718096;">Loading analytics...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
         <!-- TAB 1: PRODUCTS MASTER -->
-        <div id="admin-tab-products" class="admin-tab-content">
+        <div id="admin-tab-products" class="admin-tab-content" style="display: none;">
             <div style="background: #f8fafc; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 24px;">
                 <h3 id="form-title" style="margin-top: 0; color: #1a202c; font-size: 1.1rem;">➕ Add / Edit Product</h3>
                 <form id="admin-product-form" onsubmit="saveProduct(event)" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; align-items: flex-end;">
@@ -227,6 +272,33 @@
                             <tr><td colspan="5" style="padding: 15px; text-align: center; color: #718096;">Loading current stock inventory...</td></tr>
                         </tbody>
                     </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB X: PROFIT & LOSS REPORT -->
+        <div id="admin-tab-pnl" class="admin-tab-content" style="display: none;">
+            <h3 style="margin-top: 0; color: #1a202c;">Realized Profit & Loss (Delivered Orders Only)</h3>
+            <p style="color: #718096; font-size: 0.85rem;">This ledger calculates realized revenue, historic cost of goods sold (COGS), and gross margin strictly for orders marked as <strong>"Delivered"</strong>.</p>
+            
+            <div style="background: white; padding: 30px; border-radius: 12px; border: 1px solid #e2e8f0; max-width: 600px; margin-top: 20px;">
+                <h4 style="margin: 0 0 20px 0; font-size: 1.2rem; color: #2d3748; text-align: center; border-bottom: 2px solid #edf2f7; padding-bottom: 10px;">Income Statement Summary</h4>
+                
+                <div style="display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 1.05rem;">
+                    <span style="color: #4a5568;">Gross Revenue (Sales)</span>
+                    <strong id="pnl-revenue" style="color: #2b6cb0;">K 0.00</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 1.05rem; border-bottom: 1px solid #edf2f7; padding-bottom: 12px;">
+                    <span style="color: #e53e3e;">Less: Cost of Goods Sold (COGS)</span>
+                    <strong id="pnl-cogs" style="color: #e53e3e;">(K 0.00)</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 1.2rem;">
+                    <strong style="color: #2d3748;">Gross Profit</strong>
+                    <strong id="pnl-profit" style="color: #0baf65;">K 0.00</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 1rem; background: #f7fafc; padding: 10px; border-radius: 6px; margin-top: 16px;">
+                    <span style="color: #4a5568;">Gross Margin Percentage</span>
+                    <strong id="pnl-margin" style="color: #2d3748;">0.00%</strong>
                 </div>
             </div>
         </div>
