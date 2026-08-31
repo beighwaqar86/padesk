@@ -20,23 +20,79 @@
         <!-- Navigation Tabs -->
         <div style="display: flex; gap: 10px; margin-bottom: 24px;">
             <button type="button" onclick="switchAdminTab('products')" id="tab-btn-products" style="background: #0baf65; color: white; border: none; padding: 10px 16px; border-radius: 8px; font-weight: bold; cursor: pointer;">📦 Products Master</button>
-            <button type="button" onclick="switchAdminTab('banners')" id="tab-btn-banners" style="background: #edf2f7; color: #4a5568; border: none; padding: 10px 16px; border-radius: 8px; font-weight: bold; cursor: pointer;">⚡ Ready-Made Combos & Banners</button>
+            <button type="button" onclick="switchAdminTab('purchases')" id="tab-btn-purchases" style="background: #edf2f7; color: #4a5568; border: none; padding: 10px 16px; border-radius: 8px; font-weight: bold; cursor: pointer;">📥 Purchases & Stock</button>
+            <button type="button" onclick="switchAdminTab('banners')" id="tab-btn-banners" style="background: #edf2f7; color: #4a5568; border: none; padding: 10px 16px; border-radius: 8px; font-weight: bold; cursor: pointer;">⚡ Ready-Made Combos</button>
             <button type="button" onclick="switchAdminTab('fulfillment')" id="tab-btn-fulfillment" style="background: #edf2f7; color: #4a5568; border: none; padding: 10px 16px; border-radius: 8px; font-weight: bold; cursor: pointer;">🚚 Order Fulfillment</button>
         </div>
 
         <!-- TAB 1: PRODUCTS MASTER -->
         <div id="admin-tab-products" class="admin-tab-content">
             <h3>Products Master Inventory</h3>
-            <div id="admin-products-list">Loading products inventory...</div>
+            <div style="overflow-x: auto;">
+                <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem;">
+                    <thead>
+                        <tr style="background: #f7fafc; border-bottom: 2px solid #e2e8f0; color: #4a5568;">
+                            <th style="padding: 8px;">Code</th>
+                            <th style="padding: 8px;">Name</th>
+                            <th style="padding: 8px;">Category</th>
+                            <th style="padding: 8px;">Price</th>
+                            <th style="padding: 8px; text-align: center;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="admin-product-table">
+                        <tr><td colspan="5" style="padding: 20px; text-align: center;">Loading products inventory...</td></tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
 
-        <!-- TAB 2: READY-MADE COMBO BANNERS -->
+        <!-- TAB 2: PURCHASES & STOCK INTAKE -->
+        <div id="admin-tab-purchases" class="admin-tab-content" style="display: none;">
+            <div class="admin-card" style="background: white; padding: 20px; border-radius: 10px; border: 1px solid #e2e8f0; margin-bottom: 20px;">
+                <h3 style="margin-top: 0; color: #1a202c; font-size: 1.1rem;">📦 Record New Stock Purchase</h3>
+                <form id="purchase-form" onsubmit="recordPurchase(event)" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; align-items: flex-end;">
+                    
+                    <div>
+                        <label style="font-size: 0.78rem; font-weight: bold; color: #4a5568;">Select Product (SKU)</label>
+                        <select id="purchase-product-select" required style="width: 100%; padding: 8px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 0.85rem;">
+                            <option value="">-- Choose Product --</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label style="font-size: 0.78rem; font-weight: bold; color: #4a5568;">Supplier Name</label>
+                        <input type="text" id="purchase-supplier" placeholder="e.g., Zamlec / Trade King" required style="width: 100%; padding: 8px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 0.85rem; box-sizing: border-box;">
+                    </div>
+
+                    <div>
+                        <label style="font-size: 0.78rem; font-weight: bold; color: #4a5568;">Invoice / PO Reference</label>
+                        <input type="text" id="purchase-invoice" placeholder="e.g., INV-9982" style="width: 100%; padding: 8px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 0.85rem; box-sizing: border-box;">
+                    </div>
+
+                    <div>
+                        <label style="font-size: 0.78rem; font-weight: bold; color: #4a5568;">Quantity Received</label>
+                        <input type="number" id="purchase-qty" placeholder="100" min="1" required style="width: 100%; padding: 8px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 0.85rem; box-sizing: border-box;">
+                    </div>
+
+                    <div>
+                        <label style="font-size: 0.78rem; font-weight: bold; color: #4a5568;">Purchase Unit Cost (K)</label>
+                        <input type="number" step="0.01" id="purchase-unit-cost" placeholder="0.00" min="0" required style="width: 100%; padding: 8px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 0.85rem; box-sizing: border-box;">
+                    </div>
+
+                    <div>
+                        <button type="submit" style="background: #0baf65; color: white; border: none; padding: 9px 16px; border-radius: 6px; font-weight: bold; cursor: pointer; width: 100%; font-size: 0.85rem;">Save & Restock</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- TAB 3: READY-MADE COMBO BANNERS -->
         <div id="admin-tab-banners" class="admin-tab-content" style="display: none;">
             <h3>Ready-Made Combo Banners Manager</h3>
             <div id="admin-banners-list">Loading banners...</div>
         </div>
 
-        <!-- TAB 3: ORDER FULFILLMENT -->
+        <!-- TAB 4: ORDER FULFILLMENT -->
         <div id="admin-tab-fulfillment" class="admin-tab-content" style="display: none;">
             <h3 style="margin-bottom: 4px;">Corporate Office Orders & Fulfillment</h3>
             <p style="color: #718096; font-size: 0.85rem; margin-top: 0;">Review corporate purchases, expand items breakdown, and update fulfillment statuses.</p>
@@ -53,7 +109,7 @@
                             <th style="padding: 10px;">Fulfillment Status & Action</th>
                         </tr>
                     </thead>
-                    <tbody id="fulfillment-orders-list">
+                    <tbody id="admin-orders-table">
                         <tr><td colspan="6" style="padding: 20px; text-align: center; color: #718096;">Loading fulfillment hub...</td></tr>
                     </tbody>
                 </table>
@@ -61,43 +117,7 @@
         </div>
 
     </div>
-<div class="admin-card" style="background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.05); margin-bottom: 20px;">
-    <h3 style="margin-top: 0; color: #1a202c; font-size: 1.1rem;">📦 Record New Stock Purchase</h3>
-    <form id="purchase-form" onsubmit="recordPurchase(event)" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; align-items: flex-end;">
-        
-        <div>
-            <label style="font-size: 0.78rem; font-weight: bold; color: #4a5568;">Select Product (SKU)</label>
-            <select id="purchase-product-select" required style="width: 100%; padding: 8px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 0.85rem;">
-                <option value="">-- Choose Product --</option>
-                <!-- Populated dynamically -->
-            </select>
-        </div>
 
-        <div>
-            <label style="font-size: 0.78rem; font-weight: bold; color: #4a5568;">Supplier Name</label>
-            <input type="text" id="purchase-supplier" placeholder="e.g., Zamlec / Trade King" required style="width: 100%; padding: 8px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 0.85rem; box-sizing: border-box;">
-        </div>
-
-        <div>
-            <label style="font-size: 0.78rem; font-weight: bold; color: #4a5568;">Invoice / PO Reference</label>
-            <input type="text" id="purchase-invoice" placeholder="e.g., INV-9982" style="width: 100%; padding: 8px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 0.85rem; box-sizing: border-box;">
-        </div>
-
-        <div>
-            <label style="font-size: 0.78rem; font-weight: bold; color: #4a5568;">Quantity Received</label>
-            <input type="number" id="purchase-qty" placeholder="100" min="1" required style="width: 100%; padding: 8px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 0.85rem; box-sizing: border-box;">
-        </div>
-
-        <div>
-            <label style="font-size: 0.78rem; font-weight: bold; color: #4a5568;">Purchase Unit Cost (K)</label>
-            <input type="number" step="0.01" id="purchase-unit-cost" placeholder="0.00" min="0" required style="width: 100%; padding: 8px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 0.85rem; box-sizing: border-box;">
-        </div>
-
-        <div>
-            <button type="submit" style="background: #0baf65; color: white; border: none; padding: 9px 16px; border-radius: 6px; font-weight: bold; cursor: pointer; width: 100%; font-size: 0.85rem;">Save & Restock</button>
-        </div>
-    </form>
-</div>
     <script src="admin.js"></script>
 </body>
 </html>
