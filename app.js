@@ -239,29 +239,27 @@ async function loadCustomerCustomCombos(phone) {
 }
 
 // 6. ACCOUNT DETAILS DRAWER TOGGLE & HISTORY FETCH
-function toggleAccountDrawer() {
-    const drawer = document.getElementById("account-drawer");
-    const overlay = document.getElementById("account-drawer-overlay");
-    if (drawer && overlay) {
-        const isOpen = drawer.classList.contains("open");
-        drawer.classList.toggle("open");
-        overlay.style.display = isOpen ? "none" : "block";
 
-        const savedPhone = localStorage.getItem("padesk_phone");
-        if (!isOpen) {
-            if (savedPhone) {
-                loadAccountHistory(savedPhone);
-            } else {
-                resetAccountDrawerUI();
-            }
-        }
+// Attach toggle function directly to window so it fires correctly from inline HTML
+window.toggleCustomerOrderDetails = function(orderId) {
+    const detailBox = document.getElementById(`cust-order-details-${orderId}`);
+    if (detailBox) {
+        detailBox.style.display = detailBox.style.display === 'none' ? 'block' : 'none';
     }
-}
+};
 
 async function loadAccountHistory(phone) {
     const profileBox = document.getElementById("account-profile-info");
     const historyList = document.getElementById("account-order-history");
     const signOutBtn = document.getElementById("drawer-signout-btn");
+
+    if (!historyList) return;
+
+    // 1. Immediately wipe out any default blank lines/placeholders and show a loading state
+    historyList.innerHTML = `<div style="text-align:center; padding: 20px; color:#718096; font-size:0.85rem;">⏳ Loading your orders...</div>`;
+    historyList.style.background = "none";
+    historyList.style.border = "none";
+    historyList.style.boxShadow = "none";
 
     const savedTitle = localStorage.getItem("padesk_title") || "";
     const savedFirstName = localStorage.getItem("padesk_first_name") || "Valued Shopper";
@@ -278,79 +276,97 @@ async function loadAccountHistory(phone) {
 
     if (signOutBtn) signOutBtn.style.display = "block";
 
-    const { data: orders } = await db
-        .from('orders')
-        .select('*')
-        .eq('customer_phone', phone)
-        .order('id', { ascending: false });
+    // 2. Wrap DB call in try/catch to ensure we see if Supabase blocks the read request
+    try {
+        const { data: orders, error } = await db
+            .from('orders')
+            .select('*')
+            .eq('customer_phone', phone)
+            .order('id', { ascending: false });
 
-    if (historyList) {
-        // Force override any global CSS lines or repeating borders on the container
-        historyList.style.cssText = "border: none !important; background: transparent !important; background-image: none !important; box-shadow: none !important;";
+        if (error) {
+            throw new Error(error.message);
+        }
 
         if (!orders || orders.length === 0) {
-            historyList.innerHTML = "<p style='color:#718096; font-size:0.85rem; padding:10px;'><small>No past orders found.</small></p>";
-        } else {
-            historyList.innerHTML = orders.map(o => {
-                const orderDate = o.created_at ? new Date(o.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '-';
-                const orderNum = o.order_number || (`#ORD-${o.id}`);
-                const status = o.fulfillment_status || 'Order Placed';
-                const items = o.order_items_json || [];
+            historyList.innerHTML = `
+                <div style="text-align:center; padding:20px; background:#f8fafc; border-radius:8px; color:#718096;">
+                    <span style="font-size:1.5rem;">🛍️</span><br>
+                    <small>No past orders found.</small>
+                </div>
+            `;
+            return;
+        }
 
-                const statusColor = status === 'Delivered' ? '#0baf65' : (status === 'Cancelled' ? '#e53e3e' : '#3182ce');
+        // 3. Render the detailed accordion cards
+        historyList.innerHTML = orders.map(o => {
+            const orderDate = o.created_at ? new Date(o.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '-';
+            const orderNum = o.order_number || (`#ORD-${o.id}`);
+            const status = o.fulfillment_status || 'Order Placed';
+            const items = o.order_items_json || [];
 
-                return `
-                    <div style="background: #ffffff !important; border: 1px solid #cbd5e0 !important; border-radius: 10px !important; margin-bottom: 12px !important; overflow: hidden !important; box-shadow: 0 2px 4px rgba(0,0,0,0.04) !important;">
-                        <!-- Summary Clickable Header -->
-                        <div onclick="toggleCustomerOrderDetails(${o.id})" style="padding: 12px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; background: #ffffff;">
-                            <div>
-                                <div style="font-weight: bold; font-size: 0.85rem; color: #2d3748;">${orderNum}</div>
-                                <small style="color: #718096; font-size: 0.72rem;">📅 ${orderDate} • <span style="color: ${statusColor}; font-weight: bold;">${status}</span></small>
-                            </div>
-                            <div style="text-align: right;">
-                                <div style="font-weight: bold; color: #0baf65; font-size: 0.85rem;">K ${parseFloat(o.total_amount).toFixed(2)}</div>
-                                <small style="color: #a0aec0; font-size: 0.7rem;">Tap view ▾</small>
-                            </div>
+            const statusColor = status === 'Delivered' ? '#0baf65' : (status === 'Cancelled' ? '#e53e3e' : '#3182ce');
+
+            return `
+                <div style="background: #ffffff; border: 1px solid #cbd5e0; border-radius: 10px; margin-bottom: 12px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.05); text-align: left;">
+                    <!-- Summary Clickable Header -->
+                    <div onclick="toggleCustomerOrderDetails(${o.id})" style="padding: 12px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; background: #ffffff;">
+                        <div>
+                            <div style="font-weight: bold; font-size: 0.85rem; color: #2d3748;">${orderNum}</div>
+                            <small style="color: #718096; font-size: 0.72rem;">📅 ${orderDate} • <span style="color: ${statusColor}; font-weight: bold;">${status}</span></small>
                         </div>
-
-                        <!-- Collapsible Detailed Breakdown -->
-                        <div id="cust-order-details-${o.id}" style="display: none; background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 12px;">
-                            <div style="font-size: 0.75rem; color: #4a5568; margin-bottom: 8px;">
-                                📍 <strong>Delivery:</strong> ${o.delivery_location || '-'}<br>
-                                💳 <strong>Payment:</strong> ${o.payment_method || 'CoD'} (${o.payment_status || 'Pending'})
-                            </div>
-                            <div style="font-weight: bold; font-size: 0.78rem; margin-bottom: 6px; color: #2d3748;">📦 Ordered Items (${items.length}):</div>
-                            <table style="width: 100%; font-size: 0.75rem; border-collapse: collapse;">
-                                <thead>
-                                    <tr style="border-bottom: 1px solid #cbd5e0; text-align: left; color: #718096;">
-                                        <th style="padding: 4px;">Item</th>
-                                        <th style="padding: 4px; text-align: center;">Qty</th>
-                                        <th style="padding: 4px; text-align: right;">Total</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${items.map(item => {
-                                        const p = item.product || {};
-                                        const price = parseFloat(p.deal_price || p.price || 0);
-                                        const lineTotal = price * (item.qty || 1);
-                                        return `
-                                            <tr style="border-bottom: 1px solid #edf2f7;">
-                                                <td style="padding: 6px 4px; font-weight: 500; color: #2d3748;">${p.name || 'Item'}</td>
-                                                <td style="padding: 6px 4px; text-align: center; color: #4a5568;">${item.qty || 1}</td>
-                                                <td style="padding: 6px 4px; text-align: right; font-weight: bold; color: #0baf65;">K ${lineTotal.toFixed(2)}</td>
-                                            </tr>
-                                        `;
-                                    }).join('')}
-                                </tbody>
-                            </table>
+                        <div style="text-align: right;">
+                            <div style="font-weight: bold; color: #0baf65; font-size: 0.85rem;">K ${parseFloat(o.total_amount).toFixed(2)}</div>
+                            <small style="color: #a0aec0; font-size: 0.7rem;">Tap view ▾</small>
                         </div>
                     </div>
-                `;
-            }).join('');
-        }
+
+                    <!-- Collapsible Detailed Breakdown -->
+                    <div id="cust-order-details-${o.id}" style="display: none; background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 12px;">
+                        <div style="font-size: 0.75rem; color: #4a5568; margin-bottom: 8px;">
+                            📍 <strong>Delivery:</strong> ${o.delivery_location || '-'}<br>
+                            💳 <strong>Payment:</strong> ${o.payment_method || 'CoD'} (${o.payment_status || 'Pending'})
+                        </div>
+                        <div style="font-weight: bold; font-size: 0.78rem; margin-bottom: 6px; color: #2d3748;">📦 Ordered Items (${items.length}):</div>
+                        <table style="width: 100%; font-size: 0.75rem; border-collapse: collapse;">
+                            <thead>
+                                <tr style="border-bottom: 1px solid #cbd5e0; text-align: left; color: #718096;">
+                                    <th style="padding: 4px;">Item</th>
+                                    <th style="padding: 4px; text-align: center;">Qty</th>
+                                    <th style="padding: 4px; text-align: right;">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${items.map(item => {
+                                    const p = item.product || {};
+                                    const price = parseFloat(p.deal_price || p.price || 0);
+                                    const lineTotal = price * (item.qty || 1);
+                                    return `
+                                        <tr style="border-bottom: 1px solid #edf2f7;">
+                                            <td style="padding: 6px 4px; font-weight: 500; color: #2d3748;">${p.name || 'Item'}</td>
+                                            <td style="padding: 6px 4px; text-align: center; color: #4a5568;">${item.qty || 1}</td>
+                                            <td style="padding: 6px 4px; text-align: right; font-weight: bold; color: #0baf65;">K ${lineTotal.toFixed(2)}</td>
+                                        </tr>
+                                    `;
+                                }).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+    } catch (err) {
+        console.error("Failed to load history:", err);
+        // If Supabase RLS is blocking the query, show this error visibly instead of failing silently.
+        historyList.innerHTML = `
+            <div style="padding: 15px; color: #e53e3e; background: #fff5f5; border: 1px solid #feb2b2; border-radius: 8px; font-size: 0.8rem; text-align: left;">
+                <strong>⚠️ Could not load history.</strong><br>
+                ${err.message || 'Check database connection or table permissions.'}
+            </div>
+        `;
     }
 }
-
 // 7. READY-MADE ADMIN COMBO BANNERS SLIDER (+ Add Combo on Top Right Corner)
 async function loadBanners() {
     const { data: banners } = await db.from('banners').select('*').eq('is_active', true);
