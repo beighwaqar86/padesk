@@ -899,10 +899,10 @@ async function executeFinalOrderSubmission() {
             const effectivePrice = parseFloat(item.product.deal_price || item.product.price || 0);
             const itemCost = parseFloat(item.product.cost_price || 0);
 
-            // Guardrail A: Zero Selling Below Cost
-            if (effectivePrice < itemCost) {
-                throw new Error(`Pricing violation: "${item.product.name}" is priced at K ${effectivePrice.toFixed(2)} which is below its cost price of K ${itemCost.toFixed(2)}.`);
-            }
+            // Guardrail A: Zero Selling Below Cost (Internal block, friendly customer message)
+if (effectivePrice < itemCost) {
+    throw new Error(`We are currently updating pricing for "${item.product.name}". Please remove it from your cart or contact support to proceed.`);
+}
 
             // Guardrail B: Stock Availability Check with sell_oos override
             const { data: liveProd, error: stockCheckErr } = await db.from('products').select('stock_qty, name, sell_oos').eq('id', prodId).single();
