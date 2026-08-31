@@ -96,25 +96,6 @@ function signOut() {
     autoPopulateSavedCustomer();
 }
 
-function resetAccountDrawerUI() {
-    const profileBox = document.getElementById("account-profile-info");
-    const historyList = document.getElementById("account-order-history");
-    const signOutBtn = document.getElementById("drawer-signout-btn");
-
-    if (profileBox) {
-        profileBox.innerHTML = `
-            <p style="margin:0;"><small>You are currently browsing as a <strong>Guest</strong>.</small></p>
-            <small style="color:#718096;">Enter your mobile number at checkout or in the top bar to load your account profile.</small>
-        `;
-    }
-    if (historyList) {
-        historyList.innerHTML = "<p><small>No active session found.</small></p>";
-    }
-    if (signOutBtn) {
-        signOutBtn.style.display = "none";
-    }
-}
-
 // 3. QUICK LOGIN TRIGGER
 async function triggerQuickLogin() {
     const input = document.getElementById("quick-phone");
@@ -238,8 +219,7 @@ async function loadCustomerCustomCombos(phone) {
     }
 }
 
-// 6. ACCOUNT DETAILS DRAWER TOGGLE & HISTORY FETCH
-
+// 6. ACCOUNT DETAILS DRAWER TOGGLE & BULLETPROOF HISTORY FETCH
 function toggleAccountDrawer() {
     const drawer = document.getElementById("account-drawer");
     const overlay = document.getElementById("account-drawer-overlay");
@@ -271,7 +251,7 @@ function resetAccountDrawerUI() {
         `;
     }
     if (historyList) {
-        historyList.style.cssText = "border: none; background: transparent; box-shadow: none;";
+        historyList.style.cssText = "border:none !important; background:transparent !important; box-shadow:none !important; padding:0 !important;";
         historyList.innerHTML = "<p style='color:#718096; font-size:0.85rem;'><small>No active session found.</small></p>";
     }
     if (signOutBtn) {
@@ -279,7 +259,7 @@ function resetAccountDrawerUI() {
     }
 }
 
-// Attach toggle function directly to window so it fires correctly from inline HTML
+// Attach globally to ensure onclick works
 window.toggleCustomerOrderDetails = function(orderId) {
     const detailBox = document.getElementById(`cust-order-details-${orderId}`);
     if (detailBox) {
@@ -294,14 +274,12 @@ async function loadAccountHistory(phone) {
 
     if (!historyList) return;
 
-    // 1. Immediately wipe out any default blank lines/placeholders and show a loading state
-    historyList.innerHTML = `<div style="text-align:center; padding: 20px; color:#718096; font-size:0.85rem;">⏳ Loading your orders...</div>`;
-    historyList.style.background = "none";
-    historyList.style.border = "none";
-    historyList.style.boxShadow = "none";
+    // Immediately show loading state and strip conflicting global CSS
+    historyList.style.cssText = "border:none !important; background:transparent !important; box-shadow:none !important; padding:0 !important;";
+    historyList.innerHTML = '<div style="padding: 20px; text-align: center; color: #718096; font-family: sans-serif;">⏳ Loading orders...</div>';
 
     const savedTitle = localStorage.getItem("padesk_title") || "";
-    const savedFirstName = localStorage.getItem("padesk_first_name") || "Valued Shopper";
+    const savedFirstName = localStorage.getItem("padesk_first_name") || "Shopper";
     const savedLastName = localStorage.getItem("padesk_last_name") || "";
     const savedOffice = localStorage.getItem("padesk_office") || "Not set";
 
@@ -315,7 +293,6 @@ async function loadAccountHistory(phone) {
 
     if (signOutBtn) signOutBtn.style.display = "block";
 
-    // 2. Wrap DB call in try/catch to ensure we see if Supabase blocks the read request
     try {
         const { data: orders, error } = await db
             .from('orders')
@@ -323,89 +300,65 @@ async function loadAccountHistory(phone) {
             .eq('customer_phone', phone)
             .order('id', { ascending: false });
 
-        if (error) {
-            throw new Error(error.message);
-        }
+        if (error) throw error;
 
         if (!orders || orders.length === 0) {
-            historyList.innerHTML = `
-                <div style="text-align:center; padding:20px; background:#f8fafc; border-radius:8px; color:#718096;">
-                    <span style="font-size:1.5rem;">🛍️</span><br>
-                    <small>No past orders found.</small>
-                </div>
-            `;
+            historyList.innerHTML = '<div style="padding: 20px; text-align: center; color: #718096;">No past orders found.</div>';
             return;
         }
 
-        // 3. Render the detailed accordion cards
         historyList.innerHTML = orders.map(o => {
-            const orderDate = o.created_at ? new Date(o.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '-';
+            const orderDate = o.created_at ? new Date(o.created_at).toLocaleDateString() : '-';
             const orderNum = o.order_number || (`#ORD-${o.id}`);
             const status = o.fulfillment_status || 'Order Placed';
             const items = o.order_items_json || [];
+            const total = parseFloat(o.total_amount || 0).toFixed(2);
+            
+            const color = status === 'Delivered' ? '#0baf65' : (status === 'Cancelled' ? '#e53e3e' : '#3182ce');
 
-            const statusColor = status === 'Delivered' ? '#0baf65' : (status === 'Cancelled' ? '#e53e3e' : '#3182ce');
+            // Generate items carefully without tables
+            let itemsHtml = items.map(item => {
+                const pName = (item.product && item.product.name) ? item.product.name : 'Item';
+                const pPrice = item.product ? parseFloat(item.product.deal_price || item.product.price || 0) : 0;
+                return `
+                    <div style="display: flex; justify-content: space-between; font-size: 0.75rem; border-bottom: 1px solid #edf2f7; padding: 6px 0; color: #2d3748;">
+                        <span>${item.qty || 1}x ${pName}</span>
+                        <strong style="color: #0baf65;">K ${(pPrice * (item.qty || 1)).toFixed(2)}</strong>
+                    </div>
+                `;
+            }).join('');
 
             return `
-                <div style="background: #ffffff; border: 1px solid #cbd5e0; border-radius: 10px; margin-bottom: 12px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.05); text-align: left;">
-                    <!-- Summary Clickable Header -->
-                    <div onclick="toggleCustomerOrderDetails(${o.id})" style="padding: 12px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; background: #ffffff;">
+                <div style="background: white; border: 1px solid #cbd5e0; border-radius: 8px; padding: 12px; margin-bottom: 10px; font-family: sans-serif; display: block; width: 100%; box-sizing: border-box; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                    <div onclick="window.toggleCustomerOrderDetails(${o.id})" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;">
                         <div>
-                            <div style="font-weight: bold; font-size: 0.85rem; color: #2d3748;">${orderNum}</div>
-                            <small style="color: #718096; font-size: 0.72rem;">📅 ${orderDate} • <span style="color: ${statusColor}; font-weight: bold;">${status}</span></small>
+                            <div style="font-weight: bold; color: #2d3748; font-size: 0.9rem;">${orderNum}</div>
+                            <div style="font-size: 0.75rem; color: #718096;">${orderDate} • <span style="color:${color}; font-weight:bold;">${status}</span></div>
                         </div>
                         <div style="text-align: right;">
-                            <div style="font-weight: bold; color: #0baf65; font-size: 0.85rem;">K ${parseFloat(o.total_amount).toFixed(2)}</div>
-                            <small style="color: #a0aec0; font-size: 0.7rem;">Tap view ▾</small>
+                            <div style="font-weight: bold; color: #0baf65; font-size: 0.9rem;">K ${total}</div>
+                            <div style="font-size: 0.7rem; color: #a0aec0;">Tap view ▾</div>
                         </div>
                     </div>
 
-                    <!-- Collapsible Detailed Breakdown -->
-                    <div id="cust-order-details-${o.id}" style="display: none; background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 12px;">
-                        <div style="font-size: 0.75rem; color: #4a5568; margin-bottom: 8px;">
+                    <div id="cust-order-details-${o.id}" style="display: none; margin-top: 10px; padding-top: 10px; border-top: 1px solid #e2e8f0;">
+                        <div style="font-size: 0.75rem; color: #4a5568; margin-bottom: 8px; line-height: 1.4;">
                             📍 <strong>Delivery:</strong> ${o.delivery_location || '-'}<br>
-                            💳 <strong>Payment:</strong> ${o.payment_method || 'CoD'} (${o.payment_status || 'Pending'})
+                            💳 <strong>Payment:</strong> ${o.payment_method || 'CoD'}
                         </div>
-                        <div style="font-weight: bold; font-size: 0.78rem; margin-bottom: 6px; color: #2d3748;">📦 Ordered Items (${items.length}):</div>
-                        <table style="width: 100%; font-size: 0.75rem; border-collapse: collapse;">
-                            <thead>
-                                <tr style="border-bottom: 1px solid #cbd5e0; text-align: left; color: #718096;">
-                                    <th style="padding: 4px;">Item</th>
-                                    <th style="padding: 4px; text-align: center;">Qty</th>
-                                    <th style="padding: 4px; text-align: right;">Total</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${items.map(item => {
-                                    const p = item.product || {};
-                                    const price = parseFloat(p.deal_price || p.price || 0);
-                                    const lineTotal = price * (item.qty || 1);
-                                    return `
-                                        <tr style="border-bottom: 1px solid #edf2f7;">
-                                            <td style="padding: 6px 4px; font-weight: 500; color: #2d3748;">${p.name || 'Item'}</td>
-                                            <td style="padding: 6px 4px; text-align: center; color: #4a5568;">${item.qty || 1}</td>
-                                            <td style="padding: 6px 4px; text-align: right; font-weight: bold; color: #0baf65;">K ${lineTotal.toFixed(2)}</td>
-                                        </tr>
-                                    `;
-                                }).join('')}
-                            </tbody>
-                        </table>
+                        <div style="font-weight: bold; font-size: 0.75rem; color: #4a5568; margin-bottom: 4px;">📦 Ordered Items:</div>
+                        ${itemsHtml}
                     </div>
                 </div>
             `;
         }).join('');
 
     } catch (err) {
-        console.error("Failed to load history:", err);
-        historyList.innerHTML = `
-            <div style="padding: 15px; color: #e53e3e; background: #fff5f5; border: 1px solid #feb2b2; border-radius: 8px; font-size: 0.8rem; text-align: left;">
-                <strong>⚠️ Could not load history.</strong><br>
-                ${err.message || 'Check database connection or table permissions.'}
-            </div>
-        `;
+        historyList.innerHTML = `<div style="color: #e53e3e; padding: 10px; font-size: 0.8rem; background: #fff5f5; border: 1px solid #feb2b2; border-radius: 6px;"><strong>Error loading orders:</strong> ${err.message}</div>`;
     }
 }
-// 7. READY-MADE ADMIN COMBO BANNERS SLIDER (+ Add Combo on Top Right Corner)
+
+// 7. READY-MADE ADMIN COMBO BANNERS SLIDER
 async function loadBanners() {
     const { data: banners } = await db.from('banners').select('*').eq('is_active', true);
     if (!banners || banners.length === 0) return;
@@ -578,7 +531,6 @@ function selectBusinessCircle(businessName, element) {
         const busProducts = allProducts.filter(p => p.business === businessName);
         const categories = ['ALL', ...new Set(busProducts.map(p => p.category).filter(Boolean))];
 
-        // Local workspace image mapping for categories (e.g., images/category/food.png)
         const categoryImages = {
             'Food': 'images/category/food.png',
             'Home Care': 'images/category/home-care.png',
