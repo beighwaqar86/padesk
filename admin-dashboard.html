@@ -3,162 +3,115 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PaDesk - Management Dashboard</title>
+    <title>PaDesk - Management Hub</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <style>
-        .admin-nav { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; }
-        .tab-btn { background: #edf2f7; border: none; padding: 10px 16px; font-weight: bold; border-radius: 8px; cursor: pointer; font-size: 0.85rem; }
-        .tab-btn.active { background: #0baf65; color: white; }
-        .admin-section { display: none; }
-        .admin-section.active { display: block; }
-    </style>
 </head>
-<body style="background-color: #f8fafc; padding: 20px; font-family: sans-serif;">
+<body style="background: #f7fafc; padding: 20px;">
 
-    <div style="max-width: 1100px; margin: 0 auto; background: white; padding: 24px; border-radius: 16px; box-shadow: 0 4px 16px rgba(0,0,0,0.05);">
+    <div style="max-width: 1200px; margin: 0 auto; background: white; padding: 24px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
         
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-            <h2 style="margin: 0;">⚙️ PaDesk Management Hub</h2>
-            <a href="index.html" style="font-size: 0.85rem; text-decoration: none; color: #0baf65; font-weight: bold;">← Back to Store</a>
+        <!-- Header -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #edf2f7; padding-bottom: 12px;">
+            <h2 style="margin: 0; color: #1a202c;">⚙️ PaDesk Management Hub</h2>
+            <a href="index.html" style="background: #edf2f7; color: #2d3748; padding: 8px 14px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 0.85rem;">← Back to Store</a>
         </div>
 
         <!-- Navigation Tabs -->
-        <div class="admin-nav">
-            <button class="tab-btn active" onclick="switchTab('products', event)">📦 Products Master</button>
-            <button class="tab-btn" onclick="switchTab('combos', event)">⚡ Ready-Made Combos & Banners</button>
-            <button class="tab-btn" onclick="switchTab('orders', event)">🚚 Order Fulfillment</button>
+        <div style="display: flex; gap: 10px; margin-bottom: 24px; flex-wrap: wrap;">
+            <button type="button" onclick="switchAdminTab('products')" id="tab-btn-products" style="background: #0baf65; color: white; border: none; padding: 10px 16px; border-radius: 8px; font-weight: bold; cursor: pointer;">📦 Products Master</button>
+            <button type="button" onclick="switchAdminTab('purchases')" id="tab-btn-purchases" style="background: #edf2f7; color: #4a5568; border: none; padding: 10px 16px; border-radius: 8px; font-weight: bold; cursor: pointer;">📥 Purchases & Stock</button>
+            <button type="button" onclick="switchAdminTab('banners')" id="tab-btn-banners" style="background: #edf2f7; color: #4a5568; border: none; padding: 10px 16px; border-radius: 8px; font-weight: bold; cursor: pointer;">⚡ Ready-Made Combos</button>
+            <button type="button" onclick="switchAdminTab('fulfillment')" id="tab-btn-fulfillment" style="background: #edf2f7; color: #4a5568; border: none; padding: 10px 16px; border-radius: 8px; font-weight: bold; cursor: pointer;">🚚 Order Fulfillment</button>
         </div>
 
-        <!-- SECTION 1: PRODUCTS MANAGER -->
-        <div id="section-products" class="admin-section active">
-            <h3 style="margin-top:0;">Add / Edit Product</h3>
-            <form id="admin-product-form" onsubmit="saveProduct(event)" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; background: #f8fafc; padding: 16px; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 20px;">
-                <input type="hidden" id="product-id">
-
-                <div style="grid-column: span 2;">
-                    <label style="font-size:0.75rem; font-weight:700; color:#4a5568;">PRODUCT NAME *</label>
-                    <input type="text" id="p-name" required class="form-input" placeholder="e.g. Breakfast Mealie Meal 10kg">
-                </div>
-                <div>
-                    <label style="font-size:0.75rem; font-weight:700; color:#4a5568;">PRODUCT CODE / SKU</label>
-                    <input type="text" id="p-code" class="form-input" placeholder="e.g. BM10">
-                </div>
-                <div>
-                    <label style="font-size:0.75rem; font-weight:700; color:#4a5568;">BUSINESS *</label>
-                    <select id="p-business" required class="form-input">
-                        <option value="">-- Select Business --</option>
-                        <option value="Groceries">Groceries</option>
-                        <option value="Retail">Retail</option>
-                        <option value="Electronics">Electronics</option>
-                        <option value="Beauty">Beauty</option>
-                    </select>
-                </div>
-                <div>
-                    <label style="font-size:0.75rem; font-weight:700; color:#4a5568;">CATEGORY *</label>
-                    <input type="text" id="p-category" required class="form-input" placeholder="e.g. Food Cupboard">
-                </div>
-                <div>
-                    <label style="font-size:0.75rem; font-weight:700; color:#4a5568;">SUB-CATEGORY</label>
-                    <input type="text" id="p-subcategory" class="form-input" placeholder="e.g. Maize Meal">
-                </div>
-                <div>
-                    <label style="font-size:0.75rem; font-weight:700; color:#4a5568;">REGULAR PRICE (K) *</label>
-                    <input type="number" step="0.01" id="p-price" required class="form-input" placeholder="0.00">
-                </div>
-                <div>
-                    <label style="font-size:0.75rem; font-weight:700; color:#4a5568;">DEAL PRICE (K)</label>
-                    <input type="number" step="0.01" id="p-deal-price" class="form-input" placeholder="0.00">
-                </div>
-                <div>
-                    <label style="font-size:0.75rem; font-weight:700; color:#4a5568;">BRAND</label>
-                    <input type="text" id="p-brand" class="form-input" placeholder="e.g. Sunbird">
-                </div>
-                <div>
-                    <label style="font-size:0.75rem; font-weight:700; color:#4a5568;">IMAGE URL</label>
-                    <input type="url" id="p-image" class="form-input" placeholder="https://...">
-                </div>
-                <div style="grid-column: span 2; display: flex; gap: 20px; align-items: center;">
-                    <label style="font-size:0.85rem;"><input type="checkbox" id="p-active" checked> Active Stock</label>
-                </div>
-                <div style="grid-column: span 2; display: flex; gap: 10px;">
-                    <button type="submit" class="btn-primary" style="flex:1; padding:10px;">Save Product</button>
-                    <button type="button" onclick="resetProductForm()" style="background:#cbd5e0; border:none; padding:10px 20px; border-radius:8px; font-weight:bold; cursor:pointer;">Cancel</button>
-                </div>
-            </form>
-
-            <h3>Catalog List</h3>
+        <!-- TAB 1: PRODUCTS MASTER -->
+        <div id="admin-tab-products" class="admin-tab-content">
+            <h3>Products Master Inventory</h3>
             <div style="overflow-x: auto;">
-                <table style="width:100%; border-collapse:collapse; font-size:0.85rem;">
+                <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem;">
                     <thead>
-                        <tr style="background:#edf2f7; text-align:left;">
-                            <th style="padding:8px;">Code</th>
-                            <th style="padding:8px;">Name</th>
-                            <th style="padding:8px;">Hierarchy</th>
-                            <th style="padding:8px;">Price</th>
-                            <th style="padding:8px; text-align:center;">Action</th>
+                        <tr style="background: #f7fafc; border-bottom: 2px solid #e2e8f0; color: #4a5568;">
+                            <th style="padding: 8px;">Code</th>
+                            <th style="padding: 8px;">Name</th>
+                            <th style="padding: 8px;">Category</th>
+                            <th style="padding: 8px;">Price</th>
+                            <th style="padding: 8px; text-align: center;">Actions</th>
                         </tr>
                     </thead>
-                    <tbody id="admin-product-table"></tbody>
+                    <tbody id="admin-product-table">
+                        <tr><td colspan="5" style="padding: 20px; text-align: center;">Loading products inventory...</td></tr>
+                    </tbody>
                 </table>
             </div>
         </div>
 
-        <!-- SECTION 2: COMBO BANNERS MANAGER -->
-        <div id="section-combos" class="admin-section">
-            <h3 style="margin-top:0;">Manage Ready-Made Combo Banners</h3>
-            <p style="font-size:0.82rem; color:#718096;">Banners displayed on the homepage slider. To add items, paste valid JSON representing the combo bundle.</p>
-            
-            <form id="admin-banner-form" onsubmit="saveBanner(event)" style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; background: #f8fafc; padding: 16px; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 20px;">
-                <input type="hidden" id="banner-id">
-                
-                <div style="grid-column: span 2;">
-                    <label style="font-size:0.75rem; font-weight:700; color:#4a5568;">COMBO TITLE *</label>
-                    <input type="text" id="b-title" required class="form-input" placeholder="e.g. The Office Tea & Sugar Saver">
-                </div>
-                <div>
-                    <label style="font-size:0.75rem; font-weight:700; color:#4a5568;">SUBTITLE / DESCRIPTION *</label>
-                    <input type="text" id="b-subtitle" required class="form-input" placeholder="e.g. Lipton Tea, 2kg Sugar, Milk • K285">
-                </div>
-                <div>
-                    <label style="font-size:0.75rem; font-weight:700; color:#4a5568;">BANNER IMAGE URL *</label>
-                    <input type="url" id="b-image" required class="form-input" placeholder="https://...">
-                </div>
-                <div style="grid-column: span 2;">
-                    <label style="font-size:0.75rem; font-weight:700; color:#4a5568;">ITEMS JSON ARRAY (For 1-Tap Add to Cart)</label>
-                    <textarea id="b-items-json" rows="4" class="form-input" placeholder='[{"qty":1, "product":{"id":1, "name":"Tea", "price":65}}]'></textarea>
-                </div>
-                <div style="grid-column: span 2;">
-                    <label style="font-size:0.85rem;"><input type="checkbox" id="b-active" checked> Active on Homepage Slider</label>
-                </div>
-                <div style="grid-column: span 2; display: flex; gap: 10px;">
-                    <button type="submit" class="btn-primary" style="flex:1; padding:10px;">Save Banner Combo</button>
-                    <button type="button" onclick="resetBannerForm()" style="background:#cbd5e0; border:none; padding:10px 20px; border-radius:8px; font-weight:bold; cursor:pointer;">Cancel</button>
-                </div>
-            </form>
+        <!-- TAB 2: PURCHASES & STOCK INTAKE -->
+        <div id="admin-tab-purchases" class="admin-tab-content" style="display: none;">
+            <div style="background: white; padding: 20px; border-radius: 10px; border: 1px solid #e2e8f0; margin-bottom: 20px;">
+                <h3 style="margin-top: 0; color: #1a202c; font-size: 1.1rem;">📦 Record New Stock Purchase</h3>
+                <form id="purchase-form" onsubmit="recordPurchase(event)" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; align-items: flex-end;">
+                    
+                    <div>
+                        <label style="font-size: 0.78rem; font-weight: bold; color: #4a5568;">Select Product (SKU)</label>
+                        <select id="purchase-product-select" required style="width: 100%; padding: 8px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 0.85rem;">
+                            <option value="">-- Choose Product --</option>
+                        </select>
+                    </div>
 
-            <h3>Active Banner Combos</h3>
-            <div id="admin-banners-list"></div>
+                    <div>
+                        <label style="font-size: 0.78rem; font-weight: bold; color: #4a5568;">Supplier Name</label>
+                        <input type="text" id="purchase-supplier" placeholder="e.g., Zamlec / Trade King" required style="width: 100%; padding: 8px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 0.85rem; box-sizing: border-box;">
+                    </div>
+
+                    <div>
+                        <label style="font-size: 0.78rem; font-weight: bold; color: #4a5568;">Invoice / PO Reference</label>
+                        <input type="text" id="purchase-invoice" placeholder="e.g., INV-9982" style="width: 100%; padding: 8px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 0.85rem; box-sizing: border-box;">
+                    </div>
+
+                    <div>
+                        <label style="font-size: 0.78rem; font-weight: bold; color: #4a5568;">Quantity Received</label>
+                        <input type="number" id="purchase-qty" placeholder="100" min="1" required style="width: 100%; padding: 8px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 0.85rem; box-sizing: border-box;">
+                    </div>
+
+                    <div>
+                        <label style="font-size: 0.78rem; font-weight: bold; color: #4a5568;">Purchase Unit Cost (K)</label>
+                        <input type="number" step="0.01" id="purchase-unit-cost" placeholder="0.00" min="0" required style="width: 100%; padding: 8px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 0.85rem; box-sizing: border-box;">
+                    </div>
+
+                    <div>
+                        <button type="submit" style="background: #0baf65; color: white; border: none; padding: 9px 16px; border-radius: 6px; font-weight: bold; cursor: pointer; width: 100%; font-size: 0.85rem;">Save & Restock</button>
+                    </div>
+                </form>
+            </div>
         </div>
 
-        <!-- SECTION 3: ORDER FULFILLMENT -->
-        <div id="section-orders" class="admin-section">
-            <h3 style="margin-top:0;">Corporate Office Orders & Fulfillment</h3>
+        <!-- TAB 3: READY-MADE COMBO BANNERS -->
+        <div id="admin-tab-banners" class="admin-tab-content" style="display: none;">
+            <h3>Ready-Made Combo Banners Manager</h3>
+            <div id="admin-banners-list">Loading banners...</div>
+        </div>
+
+        <!-- TAB 4: ORDER FULFILLMENT -->
+        <div id="admin-tab-fulfillment" class="admin-tab-content" style="display: none;">
+            <h3 style="margin-bottom: 4px;">Corporate Office Orders & Fulfillment</h3>
             <p style="color: #718096; font-size: 0.85rem; margin-top: 0;">Review corporate purchases, expand items breakdown, and update fulfillment statuses.</p>
             
             <div style="overflow-x: auto;">
-                <table style="width:100%; border-collapse:collapse; font-size:0.82rem;">
+                <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem;">
                     <thead>
-                        <tr style="background:#edf2f7; text-align:left; border-bottom: 2px solid #cbd5e0;">
-                            <th style="padding:10px;">ID</th>
-                            <th style="padding:10px;">Order Date</th>
-                            <th style="padding:10px;">Order Number</th>
-                            <th style="padding:10px;">Customer Name</th>
-                            <th style="padding:10px;">Total & Payment</th>
-                            <th style="padding:10px;">Fulfillment Status & Action</th>
+                        <tr style="background: #f7fafc; border-bottom: 2px solid #e2e8f0; color: #4a5568;">
+                            <th style="padding: 10px;">ID</th>
+                            <th style="padding: 10px;">Order Date</th>
+                            <th style="padding: 10px;">Order Number</th>
+                            <th style="padding: 10px;">Customer Name</th>
+                            <th style="padding: 10px;">Total & Payment</th>
+                            <th style="padding: 10px;">Fulfillment Status & Action</th>
                         </tr>
                     </thead>
-                    <tbody id="admin-orders-table"></tbody>
+                    <tbody id="admin-orders-table">
+                        <tr><td colspan="6" style="padding: 20px; text-align: center; color: #718096;">Loading fulfillment hub...</td></tr>
+                    </tbody>
                 </table>
             </div>
         </div>
