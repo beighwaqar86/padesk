@@ -117,7 +117,26 @@
         </div>
 
     </div>
-
+<!-- Add this inside your admin-tab-products or create a dedicated stock overview block -->
+<div style="margin-top: 20px; background: white; padding: 20px; border-radius: 10px; border: 1px solid #e2e8f0;">
+    <h3 style="margin-top: 0; color: #1a202c; font-size: 1.1rem;">📊 Current Stock Holdings & Valuation</h3>
+    <div style="overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem;">
+            <thead>
+                <tr style="background: #f7fafc; border-bottom: 2px solid #e2e8f0; color: #4a5568;">
+                    <th style="padding: 10px;">SKU / Code</th>
+                    <th style="padding: 10px;">Product Name</th>
+                    <th style="padding: 10px; text-align: center;">Stock Qty</th>
+                    <th style="padding: 10px; text-align: right;">Unit Cost (K)</th>
+                    <th style="padding: 10px; text-align: right;">Total Stock Value (K)</th>
+                </tr>
+            </thead>
+            <tbody id="admin-stock-holdings-table">
+                <tr><td colspan="5" style="padding: 15px; text-align: center; color: #718096;">Loading current stock inventory...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
     <script src="admin.js"></script>
 </body>
 </html>
