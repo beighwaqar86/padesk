@@ -357,7 +357,14 @@ async function loadAccountHistory(phone) {
         historyList.innerHTML = `<div style="color: #e53e3e; padding: 10px; font-size: 0.8rem; background: #fff5f5; border: 1px solid #feb2b2; border-radius: 6px;"><strong>Error loading orders:</strong> ${err.message}</div>`;
     }
 }
-
+function openFullOrderHistory() {
+    const phone = localStorage.getItem("padesk_phone");
+    if (!phone) {
+        alert("Please sign in or enter your phone number first.");
+        return;
+    }
+    window.location.href = "my-orders.html";
+}
 // 7. READY-MADE ADMIN COMBO BANNERS SLIDER
 async function loadBanners() {
     const { data: banners } = await db.from('banners').select('*').eq('is_active', true);
