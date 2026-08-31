@@ -419,6 +419,14 @@ function addBannerComboToCart(encodedItems, comboTitle) {
             const qty = ci.qty || 1;
 
             if (product && product.id) {
+                const stockQty = product.stock_qty || 0;
+                const sellOos = product.sell_oos || 'N';
+
+                if (stockQty <= 0 && sellOos !== 'Y') {
+                    console.warn(`Skipping out-of-stock product "${product.name}" in combo.`);
+                    return;
+                }
+
                 if (cart[product.id]) {
                     cart[product.id].qty += qty;
                 } else {
@@ -679,8 +687,12 @@ function renderProducts(products) {
 
     container.innerHTML = products.map(p => {
         const activePrice = p.deal_price ? p.deal_price : p.price;
+        const stockQty = p.stock_qty || 0;
+        const sellOos = p.sell_oos || 'N';
+        const isOutOfStock = stockQty <= 0 && sellOos !== 'Y';
+
         return `
-            <div class="product-card">
+            <div class="product-card" style="${isOutOfStock ? 'opacity: 0.65; background: #f7fafc;' : ''}">
                 <div>
                     <img src="${p.image_url || 'https://via.placeholder.com/150'}" alt="${p.name}">
                     <span class="brand-tag">${p.brand || 'General'}</span>
@@ -692,7 +704,10 @@ function renderProducts(products) {
                         K ${parseFloat(activePrice).toFixed(2)}
                         ${p.deal_price ? `<small style="text-decoration:line-through; color:#a0aec0; font-size:0.75rem;">K${parseFloat(p.price).toFixed(2)}</small>` : ''}
                     </div>
-                    <button onclick='addToCart(${JSON.stringify(p)}, event)' class="btn-add">+ Add</button>
+                    ${isOutOfStock 
+                        ? `<button class="btn-add" disabled style="background: #cbd5e0; color: #718096; cursor: not-allowed;">Out of Stock</button>`
+                        : `<button onclick='addToCart(${JSON.stringify(p)}, event)' class="btn-add">+ Add</button>`
+                    }
                 </div>
             </div>
         `;
@@ -701,6 +716,14 @@ function renderProducts(products) {
 
 // 11. QUANTITY BASKET & COMBO ENGINE
 function addToCart(product, event) {
+    const stockQty = product.stock_qty || 0;
+    const sellOos = product.sell_oos || 'N';
+
+    if (stockQty <= 0 && sellOos !== 'Y') {
+        alert(`Sorry, "${product.name}" is currently out of stock.`);
+        return;
+    }
+
     if (cart[product.id]) {
         cart[product.id].qty += 1;
     } else {
@@ -869,7 +892,7 @@ async function executeFinalOrderSubmission() {
             return sum + (parseFloat(p) * item.qty);
         }, 0);
 
-        // 1. FINANCE HEAD GUARDRAIL: Check Selling Price vs Cost Price & Stock Availability
+        // 1. FINANCE HEAD GUARDRAIL: Check Selling Price vs Cost Price & Stock Availability (with sell_oos check)
         for (const item of items) {
             const prodId = item.product.id;
             const orderQty = item.qty;
@@ -881,12 +904,20 @@ async function executeFinalOrderSubmission() {
                 throw new Error(`Pricing violation: "${item.product.name}" is priced at K ${effectivePrice.toFixed(2)} which is below its cost price of K ${itemCost.toFixed(2)}.`);
             }
 
-            // Guardrail B: Stock Availability Check
-            const { data: liveProd, error: stockCheckErr } = await db.from('products').select('stock_qty, name').eq('id', prodId).single();
+            // Guardrail B: Stock Availability Check with sell_oos override
+            const { data: liveProd, error: stockCheckErr } = await db.from('products').select('stock_qty, name, sell_oos').eq('id', prodId).single();
             if (stockCheckErr || !liveProd) throw new Error(`Could not verify stock for ${item.product.name}`);
 
-            if ((liveProd.stock_qty || 0) < orderQty) {
-                throw new Error(`Insufficient stock for "${liveProd.name}". Only ${liveProd.stock_qty || 0} units available.`);
+            const currentStock = liveProd.stock_qty || 0;
+            const sellOos = liveProd.sell_oos || 'N';
+
+            if (currentStock < orderQty) {
+                if (sellOos === 'Y') {
+                    // Allowed to go negative per sell_oos override
+                    console.log(`Allowing OOS sale for "${liveProd.name}". Stock will drop into negative values.`);
+                } else {
+                    throw new Error(`Insufficient stock for "${liveProd.name}". Only ${currentStock} units available.`);
+                }
             }
         }
 
@@ -924,14 +955,14 @@ async function executeFinalOrderSubmission() {
 
         if (orderError) throw new Error("Orders Table Error: " + orderError.message);
 
-        // 3. AUTOMATED INVENTORY DEDUCTION (Deduct stock for each purchased SKU)
+        // 3. AUTOMATED INVENTORY DEDUCTION (Deduct stock, allowing negative stock if sell_oos is 'Y')
         for (const item of items) {
             const prodId = item.product.id;
             const orderQty = item.qty;
 
             // Fetch latest stock to prevent race conditions
             const { data: currentP } = await db.from('products').select('stock_qty').eq('id', prodId).single();
-            const updatedStock = Math.max(0, (currentP.stock_qty || 0) - orderQty);
+            const updatedStock = (currentP.stock_qty || 0) - orderQty; // Permits negative values
 
             await db.from('products').update({ stock_qty: updatedStock }).eq('id', prodId);
         }
