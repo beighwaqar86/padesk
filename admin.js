@@ -92,6 +92,7 @@ async function saveProduct(e) {
         deal_price: document.getElementById("p-deal-price").value ? parseFloat(document.getElementById("p-deal-price").value) : null,
         brand: document.getElementById("p-brand").value.trim() || null,
         image_url: document.getElementById("p-image").value.trim() || null,
+        sell_oos: document.getElementById("p-sell-oos").value,
         is_active: document.getElementById("p-active").checked
     };
     
@@ -119,6 +120,7 @@ function editProduct(p) {
     document.getElementById("p-deal-price").value = p.deal_price || '';
     document.getElementById("p-brand").value = p.brand || '';
     document.getElementById("p-image").value = p.image_url || '';
+    document.getElementById("p-sell-oos").value = p.sell_oos || 'N';
     document.getElementById("p-active").checked = p.is_active;
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
