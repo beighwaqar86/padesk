@@ -285,12 +285,11 @@ async function loadAccountHistory(phone) {
         .order('id', { ascending: false });
 
     if (historyList) {
-        // Clear any lingering placeholder styles/lines
-        historyList.style.border = "none";
-        historyList.style.background = "transparent";
+        // Force override any global CSS lines or repeating borders on the container
+        historyList.style.cssText = "border: none !important; background: transparent !important; background-image: none !important; box-shadow: none !important;";
 
         if (!orders || orders.length === 0) {
-            historyList.innerHTML = "<p style='color:#718096; font-size:0.85rem;'><small>No past orders found.</small></p>";
+            historyList.innerHTML = "<p style='color:#718096; font-size:0.85rem; padding:10px;'><small>No past orders found.</small></p>";
         } else {
             historyList.innerHTML = orders.map(o => {
                 const orderDate = o.created_at ? new Date(o.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '-';
@@ -301,9 +300,9 @@ async function loadAccountHistory(phone) {
                 const statusColor = status === 'Delivered' ? '#0baf65' : (status === 'Cancelled' ? '#e53e3e' : '#3182ce');
 
                 return `
-                    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; margin-bottom: 10px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
+                    <div style="background: #ffffff !important; border: 1px solid #cbd5e0 !important; border-radius: 10px !important; margin-bottom: 12px !important; overflow: hidden !important; box-shadow: 0 2px 4px rgba(0,0,0,0.04) !important;">
                         <!-- Summary Clickable Header -->
-                        <div onclick="toggleCustomerOrderDetails(${o.id})" style="padding: 12px; cursor: pointer; display: flex; justify-content: space-between; align-items: center;">
+                        <div onclick="toggleCustomerOrderDetails(${o.id})" style="padding: 12px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; background: #ffffff;">
                             <div>
                                 <div style="font-weight: bold; font-size: 0.85rem; color: #2d3748;">${orderNum}</div>
                                 <small style="color: #718096; font-size: 0.72rem;">📅 ${orderDate} • <span style="color: ${statusColor}; font-weight: bold;">${status}</span></small>
@@ -323,10 +322,10 @@ async function loadAccountHistory(phone) {
                             <div style="font-weight: bold; font-size: 0.78rem; margin-bottom: 6px; color: #2d3748;">📦 Ordered Items (${items.length}):</div>
                             <table style="width: 100%; font-size: 0.75rem; border-collapse: collapse;">
                                 <thead>
-                                    <tr style="border-bottom: 1px solid #edf2f7; text-align: left; color: #718096;">
-                                        <th style="padding: 3px;">Item</th>
-                                        <th style="padding: 3px; text-align: center;">Qty</th>
-                                        <th style="padding: 3px; text-align: right;">Total</th>
+                                    <tr style="border-bottom: 1px solid #cbd5e0; text-align: left; color: #718096;">
+                                        <th style="padding: 4px;">Item</th>
+                                        <th style="padding: 4px; text-align: center;">Qty</th>
+                                        <th style="padding: 4px; text-align: right;">Total</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -336,9 +335,9 @@ async function loadAccountHistory(phone) {
                                         const lineTotal = price * (item.qty || 1);
                                         return `
                                             <tr style="border-bottom: 1px solid #edf2f7;">
-                                                <td style="padding: 5px 3px;">${p.name || 'Item'}</td>
-                                                <td style="padding: 5px 3px; text-align: center;">${item.qty || 1}</td>
-                                                <td style="padding: 5px 3px; text-align: right; font-weight: bold; color: #0baf65;">K ${lineTotal.toFixed(2)}</td>
+                                                <td style="padding: 6px 4px; font-weight: 500; color: #2d3748;">${p.name || 'Item'}</td>
+                                                <td style="padding: 6px 4px; text-align: center; color: #4a5568;">${item.qty || 1}</td>
+                                                <td style="padding: 6px 4px; text-align: right; font-weight: bold; color: #0baf65;">K ${lineTotal.toFixed(2)}</td>
                                             </tr>
                                         `;
                                     }).join('')}
@@ -349,13 +348,6 @@ async function loadAccountHistory(phone) {
                 `;
             }).join('');
         }
-    }
-}
-
-function toggleCustomerOrderDetails(orderId) {
-    const detailBox = document.getElementById(`cust-order-details-${orderId}`);
-    if (detailBox) {
-        detailBox.style.display = detailBox.style.display === 'none' ? 'block' : 'none';
     }
 }
 
