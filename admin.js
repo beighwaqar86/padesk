@@ -120,25 +120,32 @@ function calculatePricing(source) {
 async function saveProduct(e) {
     e.preventDefault();
     const id = document.getElementById("product-id").value;
+    
+    const dealPriceRaw = document.getElementById("p-deal-price").value;
+    const dealPrice = dealPriceRaw ? parseFloat(dealPriceRaw) : null;
+    const regularPrice = parseFloat(document.getElementById("p-price").value);
+    const costPrice = parseFloat(document.getElementById("p-cost-price").value) || 0;
+
     const payload = {
         name: document.getElementById("p-name").value.trim(),
         product_code: document.getElementById("p-code").value.trim() || null,
         business: document.getElementById("p-business").value,
         category: document.getElementById("p-category").value.trim(),
         sub_category: document.getElementById("p-subcategory").value.trim() || null,
-        cost_price: parseFloat(document.getElementById("p-cost-price").value) || 0,
+        cost_price: costPrice,
         target_margin_pct: parseFloat(document.getElementById("p-markup").value) || 0,
-        price: parseFloat(document.getElementById("p-price").value),
-        deal_price: document.getElementById("p-deal-price").value ? parseFloat(document.getElementById("p-deal-price").value) : null,
+        price: regularPrice,
+        deal_price: dealPrice,
         brand: document.getElementById("p-brand").value.trim() || null,
         image_url: document.getElementById("p-image").value.trim() || null,
         sell_oos: document.getElementById("p-sell-oos").value,
         is_active: document.getElementById("p-active").checked
     };
     
-    // Safety check: Don't sell below cost
-    if (payload.price < payload.cost_price) {
-        if (!confirm("⚠️ WARNING: Selling price is below Cost Price. Are you sure you want to save?")) return;
+    // Safety check: Don't sell below cost on EITHER the regular price or the deal price
+    if (regularPrice < costPrice || (dealPrice !== null && dealPrice < costPrice)) {
+        const lowestPrice = (dealPrice !== null && dealPrice < regularPrice) ? dealPrice : regularPrice;
+        if (!confirm(`⚠️ FINANCIAL ALERT: Your selling price (K ${lowestPrice}) is below the Cost Price (K ${costPrice}). Are you sure you want to save?`)) return;
     }
 
     const query = id ? db.from('products').update(payload).eq('id', id) : db.from('products').insert([payload]);
