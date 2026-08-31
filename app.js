@@ -285,8 +285,12 @@ async function loadAccountHistory(phone) {
         .order('id', { ascending: false });
 
     if (historyList) {
+        // Clear any lingering placeholder styles/lines
+        historyList.style.border = "none";
+        historyList.style.background = "transparent";
+
         if (!orders || orders.length === 0) {
-            historyList.innerHTML = "<p><small>No past orders found.</small></p>";
+            historyList.innerHTML = "<p style='color:#718096; font-size:0.85rem;'><small>No past orders found.</small></p>";
         } else {
             historyList.innerHTML = orders.map(o => {
                 const orderDate = o.created_at ? new Date(o.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '-';
@@ -294,25 +298,24 @@ async function loadAccountHistory(phone) {
                 const status = o.fulfillment_status || 'Order Placed';
                 const items = o.order_items_json || [];
 
-                // Color code status badge
                 const statusColor = status === 'Delivered' ? '#0baf65' : (status === 'Cancelled' ? '#e53e3e' : '#3182ce');
 
                 return `
-                    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; margin-bottom: 10px; overflow: hidden; transition: all 0.2s;">
+                    <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; margin-bottom: 10px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
                         <!-- Summary Clickable Header -->
-                        <div onclick="toggleCustomerOrderDetails(${o.id})" style="padding: 10px 12px; cursor: pointer; display: flex; justify-content: space-between; align-items: center;">
+                        <div onclick="toggleCustomerOrderDetails(${o.id})" style="padding: 12px; cursor: pointer; display: flex; justify-content: space-between; align-items: center;">
                             <div>
                                 <div style="font-weight: bold; font-size: 0.85rem; color: #2d3748;">${orderNum}</div>
                                 <small style="color: #718096; font-size: 0.72rem;">📅 ${orderDate} • <span style="color: ${statusColor}; font-weight: bold;">${status}</span></small>
                             </div>
                             <div style="text-align: right;">
                                 <div style="font-weight: bold; color: #0baf65; font-size: 0.85rem;">K ${parseFloat(o.total_amount).toFixed(2)}</div>
-                                <small style="color: #a0aec0; font-size: 0.7rem;">Tap to view ▾</small>
+                                <small style="color: #a0aec0; font-size: 0.7rem;">Tap view ▾</small>
                             </div>
                         </div>
 
                         <!-- Collapsible Detailed Breakdown -->
-                        <div id="cust-order-details-${o.id}" style="display: none; background: #fff; border-top: 1px solid #e2e8f0; padding: 12px;">
+                        <div id="cust-order-details-${o.id}" style="display: none; background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 12px;">
                             <div style="font-size: 0.75rem; color: #4a5568; margin-bottom: 8px;">
                                 📍 <strong>Delivery:</strong> ${o.delivery_location || '-'}<br>
                                 💳 <strong>Payment:</strong> ${o.payment_method || 'CoD'} (${o.payment_status || 'Pending'})
@@ -332,10 +335,10 @@ async function loadAccountHistory(phone) {
                                         const price = parseFloat(p.deal_price || p.price || 0);
                                         const lineTotal = price * (item.qty || 1);
                                         return `
-                                            <tr style="border-bottom: 1px solid #f7fafc;">
-                                                <td style="padding: 4px 3px;">${p.name || 'Item'}</td>
-                                                <td style="padding: 4px 3px; text-align: center;">${item.qty || 1}</td>
-                                                <td style="padding: 4px 3px; text-align: right; font-weight: bold; color: #0baf65;">K ${lineTotal.toFixed(2)}</td>
+                                            <tr style="border-bottom: 1px solid #edf2f7;">
+                                                <td style="padding: 5px 3px;">${p.name || 'Item'}</td>
+                                                <td style="padding: 5px 3px; text-align: center;">${item.qty || 1}</td>
+                                                <td style="padding: 5px 3px; text-align: right; font-weight: bold; color: #0baf65;">K ${lineTotal.toFixed(2)}</td>
                                             </tr>
                                         `;
                                     }).join('')}
@@ -349,7 +352,6 @@ async function loadAccountHistory(phone) {
     }
 }
 
-// Toggle expansion for customer order drawer
 function toggleCustomerOrderDetails(orderId) {
     const detailBox = document.getElementById(`cust-order-details-${orderId}`);
     if (detailBox) {
