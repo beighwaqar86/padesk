@@ -10,6 +10,13 @@ window.onload = function() {
         loadAdminOrders();
         loadPurchaseProductDropdown();
         loadStockHoldings();
+        loadPurchasesHistory();
+        
+        // Default invoice date to today
+        const invDateInput = document.getElementById("purchase-invoice-date");
+        if (invDateInput) {
+            invDateInput.value = new Date().toISOString().split('T')[0];
+        }
     } catch (err) {
         console.error("Initialization error:", err);
     }
@@ -33,6 +40,7 @@ function switchAdminTab(tabName) {
 
     if (tabName === 'purchases') {
         loadPurchaseProductDropdown();
+        loadPurchasesHistory();
     }
     if (tabName === 'stock') {
         loadStockHoldings();
@@ -79,9 +87,12 @@ async function saveProduct(e) {
         product_code: document.getElementById("p-code").value.trim() || null,
         business: document.getElementById("p-business").value,
         category: document.getElementById("p-category").value.trim(),
+        sub_category: document.getElementById("p-subcategory").value.trim() || null,
         price: parseFloat(document.getElementById("p-price").value),
         deal_price: document.getElementById("p-deal-price").value ? parseFloat(document.getElementById("p-deal-price").value) : null,
-        is_active: true
+        brand: document.getElementById("p-brand").value.trim() || null,
+        image_url: document.getElementById("p-image").value.trim() || null,
+        is_active: document.getElementById("p-active").checked
     };
     
     const query = id ? db.from('products').update(payload).eq('id', id) : db.from('products').insert([payload]);
@@ -93,6 +104,7 @@ async function saveProduct(e) {
         resetProductForm();
         loadAdminProducts();
         loadStockHoldings();
+        loadPurchaseProductDropdown();
     }
 }
 
@@ -102,8 +114,12 @@ function editProduct(p) {
     document.getElementById("p-code").value = p.product_code || '';
     document.getElementById("p-business").value = p.business || '';
     document.getElementById("p-category").value = p.category || '';
+    document.getElementById("p-subcategory").value = p.sub_category || '';
     document.getElementById("p-price").value = p.price;
     document.getElementById("p-deal-price").value = p.deal_price || '';
+    document.getElementById("p-brand").value = p.brand || '';
+    document.getElementById("p-image").value = p.image_url || '';
+    document.getElementById("p-active").checked = p.is_active;
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -145,9 +161,10 @@ async function recordPurchase(event) {
     const unitCost = parseFloat(document.getElementById("purchase-unit-cost").value);
     const supplier = document.getElementById("purchase-supplier").value.trim();
     const invoiceRef = document.getElementById("purchase-invoice").value.trim();
+    const invoiceDate = document.getElementById("purchase-invoice-date").value;
 
-    if (!productId || !qty || !unitCost || !supplier) {
-        return alert("Please fill in all required purchase details.");
+    if (!productId || !qty || !unitCost || !supplier || !invoiceDate) {
+        return alert("Please fill in all required purchase details including invoice date.");
     }
 
     try {
@@ -164,6 +181,7 @@ async function recordPurchase(event) {
         const { error: purchaseErr } = await db.from('purchases').insert([{
             supplier_name: supplier,
             invoice_ref: invoiceRef,
+            purchase_date: invoiceDate,
             product_id: parseInt(productId),
             qty_received: qty,
             purchase_unit_cost: unitCost,
@@ -181,13 +199,61 @@ async function recordPurchase(event) {
 
         alert("✅ Purchase recorded successfully! Stock and acquisition cost updated.");
         document.getElementById("purchase-form").reset();
+        document.getElementById("purchase-invoice-date").value = new Date().toISOString().split('T')[0];
+        
         loadAdminProducts();
         loadStockHoldings();
+        loadPurchasesHistory();
         loadPurchaseProductDropdown();
 
     } catch (err) {
         console.error("Purchase error:", err);
         alert("Failed to record purchase: " + err.message);
+    }
+}
+
+async function loadPurchasesHistory() {
+    const tbody = document.getElementById("admin-purchases-history-table");
+    if (!tbody) return;
+
+    try {
+        const { data: purchases, error } = await db.from('purchases').select('*, products(name, product_code)').order('id', { ascending: false });
+        if (error) throw error;
+
+        if (!purchases || purchases.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" style="padding: 15px; text-align: center; color: #718096;">No purchase orders recorded yet.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = purchases.map((p, index) => {
+            const pDate = p.purchase_date ? new Date(p.purchase_date) : new Date(p.created_at || Date.now());
+            const day = String(pDate.getDate()).padStart(2, '0');
+            const month = String(pDate.getMonth() + 1).padStart(2, '0');
+            const year = pDate.getFullYear();
+            const dateStr = `${day}${month}${year}`;
+            
+            const seqNum = String(p.id || (purchases.length - index)).padStart(2, '0');
+            const poCode = `PO${dateStr}${seqNum}`;
+
+            const prodName = p.products ? p.products.name : 'Unknown Product';
+            const totalCost = p.qty_received * parseFloat(p.purchase_unit_cost);
+            const formattedDate = p.purchase_date || (p.created_at ? p.created_at.split('T')[0] : '-');
+
+            return `
+                <tr style="border-bottom: 1px solid #edf2f7;">
+                    <td style="padding: 9px; font-weight: bold; color: #2b6cb0;">${poCode}</td>
+                    <td style="padding: 9px; color: #4a5568; white-space: nowrap;">${formattedDate}</td>
+                    <td style="padding: 9px;">${p.supplier_name}</td>
+                    <td style="padding: 9px; font-weight: 600;">${prodName}</td>
+                    <td style="padding: 9px; text-align: center;">${p.qty_received}</td>
+                    <td style="padding: 9px; text-align: right;">K ${parseFloat(p.purchase_unit_cost).toFixed(2)}</td>
+                    <td style="padding: 9px; text-align: right; font-weight: bold; color: #0baf65;">K ${totalCost.toFixed(2)}</td>
+                </tr>
+            `;
+        }).join('');
+    } catch (err) {
+        console.error("Error loading purchases history:", err);
+        tbody.innerHTML = `<tr><td colspan="7" style="padding: 15px; text-align: center; color: red;">Failed to load purchase history.</td></tr>`;
     }
 }
 
