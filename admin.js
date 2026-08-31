@@ -77,7 +77,7 @@ async function loadStockHoldings() {
         `;
     } catch (err) {
         console.error("Error loading stock holdings:", err);
-        tbody.innerHTML = '<tr><td colspan="5" style="padding: 15px; text-align: center; color: red;">Failed to load stock data.</td></tr>';
+        tbody.innerHTML = `<tr><td colspan="5" style="padding: 15px; text-align: center; color: red;">Failed to load stock data: ${err.message}</td></tr>`;
     }
 }
 
