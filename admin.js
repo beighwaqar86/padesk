@@ -61,21 +61,34 @@ async function loadAdminProducts() {
             return;
         }
 
-        tbody.innerHTML = data.map(p => `
-            <tr style="border-bottom:1px solid #edf2f7;">
-                <td style="padding:8px;">${p.product_code || '-'}</td>
-                <td style="padding:8px;"><strong>${p.name}</strong></td>
-                <td style="padding:8px;"><span style="background:#e6f7f0; color:#0baf65; padding:2px 6px; border-radius:4px; font-size:0.7rem; font-weight:bold;">${p.business \vert{}\vert{} ''}</span> /${p.category}</td>
-                <td style="padding:8px;">K ${parseFloat(p.deal_price || p.price).toFixed(2)}</td>
-                <td style="padding:8px; text-align:center;">
-                    <button type="button" onclick='editProduct(${JSON.stringify(p)})' style="background:#3182ce; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;">Edit</button>
-                    <button type="button" onclick="deleteProduct(${p.id})" style="background:#e53e3e; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;">Del</button>
-                </td>
-            </tr>
-        `).join('');
+        tbody.innerHTML = data.map(p => {
+            const encodedProduct = encodeURIComponent(JSON.stringify(p));
+            return `
+                <tr style="border-bottom:1px solid #edf2f7;">
+                    <td style="padding:8px;">${p.product_code || '-'}</td>
+                    <td style="padding:8px;"><strong>${p.name}</strong></td>
+                    <td style="padding:8px;"><span style="background:#e6f7f0; color:#0baf65; padding:2px 6px; border-radius:4px; font-size:0.7rem; font-weight:bold;">${p.business || ''}</span> / ${p.category}</td>
+                    <td style="padding:8px;">K ${parseFloat(p.deal_price || p.price).toFixed(2)}</td>
+                    <td style="padding:8px; text-align:center;">
+                        <button type="button" onclick='editProductFromEncoded("${encodedProduct}")' style="background:#3182ce; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;">Edit</button>
+                        <button type="button" onclick="deleteProduct(${p.id})" style="background:#e53e3e; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;">Del</button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
     } catch (err) {
         console.error("Error loading products:", err);
         tbody.innerHTML = '<tr><td colspan="5" style="padding: 20px; text-align: center; color: red;">Failed to load products.</td></tr>';
+    }
+}
+
+// Helper function to safely decode and edit product without syntax crashes
+function editProductFromEncoded(encodedStr) {
+    try {
+        const p = JSON.parse(decodeURIComponent(encodedStr));
+        editProduct(p);
+    } catch (e) {
+        console.error("Error decoding product:", e);
     }
 }
 
