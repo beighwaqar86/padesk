@@ -288,16 +288,72 @@ async function loadAccountHistory(phone) {
         if (!orders || orders.length === 0) {
             historyList.innerHTML = "<p><small>No past orders found.</small></p>";
         } else {
-            historyList.innerHTML = orders.map(o => `
-                <div class="order-card-mini">
-                    <div style="display:flex; justify-content:space-between;">
-                        <strong>${o.order_number || ('Order #' + o.id)}</strong>
-                        <span style="color:#0baf65; font-weight:bold;">K ${parseFloat(o.total_amount).toFixed(2)}</span>
+            historyList.innerHTML = orders.map(o => {
+                const orderDate = o.created_at ? new Date(o.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '-';
+                const orderNum = o.order_number || (`#ORD-${o.id}`);
+                const status = o.fulfillment_status || 'Order Placed';
+                const items = o.order_items_json || [];
+
+                // Color code status badge
+                const statusColor = status === 'Delivered' ? '#0baf65' : (status === 'Cancelled' ? '#e53e3e' : '#3182ce');
+
+                return `
+                    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; margin-bottom: 10px; overflow: hidden; transition: all 0.2s;">
+                        <!-- Summary Clickable Header -->
+                        <div onclick="toggleCustomerOrderDetails(${o.id})" style="padding: 10px 12px; cursor: pointer; display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <div style="font-weight: bold; font-size: 0.85rem; color: #2d3748;">${orderNum}</div>
+                                <small style="color: #718096; font-size: 0.72rem;">📅 ${orderDate} • <span style="color: ${statusColor}; font-weight: bold;">${status}</span></small>
+                            </div>
+                            <div style="text-align: right;">
+                                <div style="font-weight: bold; color: #0baf65; font-size: 0.85rem;">K ${parseFloat(o.total_amount).toFixed(2)}</div>
+                                <small style="color: #a0aec0; font-size: 0.7rem;">Tap to view ▾</small>
+                            </div>
+                        </div>
+
+                        <!-- Collapsible Detailed Breakdown -->
+                        <div id="cust-order-details-${o.id}" style="display: none; background: #fff; border-top: 1px solid #e2e8f0; padding: 12px;">
+                            <div style="font-size: 0.75rem; color: #4a5568; margin-bottom: 8px;">
+                                📍 <strong>Delivery:</strong> ${o.delivery_location || '-'}<br>
+                                💳 <strong>Payment:</strong> ${o.payment_method || 'CoD'} (${o.payment_status || 'Pending'})
+                            </div>
+                            <div style="font-weight: bold; font-size: 0.78rem; margin-bottom: 6px; color: #2d3748;">📦 Ordered Items (${items.length}):</div>
+                            <table style="width: 100%; font-size: 0.75rem; border-collapse: collapse;">
+                                <thead>
+                                    <tr style="border-bottom: 1px solid #edf2f7; text-align: left; color: #718096;">
+                                        <th style="padding: 3px;">Item</th>
+                                        <th style="padding: 3px; text-align: center;">Qty</th>
+                                        <th style="padding: 3px; text-align: right;">Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${items.map(item => {
+                                        const p = item.product || {};
+                                        const price = parseFloat(p.deal_price || p.price || 0);
+                                        const lineTotal = price * (item.qty || 1);
+                                        return `
+                                            <tr style="border-bottom: 1px solid #f7fafc;">
+                                                <td style="padding: 4px 3px;">${p.name || 'Item'}</td>
+                                                <td style="padding: 4px 3px; text-align: center;">${item.qty || 1}</td>
+                                                <td style="padding: 4px 3px; text-align: right; font-weight: bold; color: #0baf65;">K ${lineTotal.toFixed(2)}</td>
+                                            </tr>
+                                        `;
+                                    }).join('')}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
-                    <small style="color:#718096;">Location: ${o.delivery_location || '-'}</small>
-                </div>
-            `).join('');
+                `;
+            }).join('');
         }
+    }
+}
+
+// Toggle expansion for customer order drawer
+function toggleCustomerOrderDetails(orderId) {
+    const detailBox = document.getElementById(`cust-order-details-${orderId}`);
+    if (detailBox) {
+        detailBox.style.display = detailBox.style.display === 'none' ? 'block' : 'none';
     }
 }
 
