@@ -475,6 +475,7 @@ async function loadBIDashboard() {
 }
 
 // --- PROFIT & LOSS REPORT ---
+// --- PROFIT & LOSS REPORT ---
 async function loadPnLReport() {
     try {
         const { data: orders, error } = await db.from('orders').select('total_amount, order_items_json').eq('fulfillment_status', 'Delivered');
@@ -485,6 +486,7 @@ async function loadPnLReport() {
 
         if (orders) {
             orders.forEach(o => {
+                // Use the official order total amount to match the BI dashboard logic
                 totalRevenue += parseFloat(o.total_amount || 0);
                 
                 const items = o.order_items_json || [];
@@ -513,7 +515,6 @@ async function loadPnLReport() {
         console.error("Error loading P&L:", err);
     }
 }
-
 // --- BANNERS ---
 async function loadAdminBanners() {
     const { data } = await db.from('banners').select('*').order('id', { ascending: false });
