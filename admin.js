@@ -4,144 +4,194 @@ let db;
 
 window.onload = function() {
     db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    fetchAdminProducts();
+    loadAdminProducts();
+    loadAdminBanners();
+    loadAdminOrders();
 };
 
-// TAB SWITCHING ENGINE
-function switchAdminTab(tabName) {
-    document.querySelectorAll('.admin-tab-content').forEach(el => el.style.display = 'none');
-    ['products', 'banners', 'fulfillment'].forEach(t => {
-        const btn = document.getElementById(`tab-btn-${t}`);
-        if (btn) {
-            btn.style.background = t === tabName ? '#0baf65' : '#edf2f7';
-            btn.style.color = t === tabName ? 'white' : '#4a5568';
-        }
-    });
-
-    const activeTab = document.getElementById(`admin-tab-${tabName}`);
-    if (activeTab) activeTab.style.display = 'block';
-
-    if (tabName === 'fulfillment') {
-        loadOrderFulfillmentHub();
-    } else if (tabName === 'products') {
-        fetchAdminProducts();
-    }
+function switchTab(tabName, event) {
+    document.querySelectorAll('.admin-section').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+    document.getElementById(`section-${tabName}`).classList.add('active');
+    event.target.classList.add('active');
 }
 
-// 📦 PRODUCTS MASTER MANAGEMENT
-async function fetchAdminProducts() {
-    const { data: products } = await db.from('products').select('*').order('id', { ascending: false });
-    const tbody = document.getElementById("admin-product-rows");
-    
-    if (!tbody) return;
-
-    tbody.innerHTML = (products || []).map(p => `
-        <tr>
-            <td><strong>${p.product_code || '-'}</strong></td>
-            <td>${p.name}</td>
-            <td>K ${parseFloat(p.price).toFixed(2)} ${p.deal_price ? `<br><small style="color:green">Deal: K${parseFloat(p.deal_price).toFixed(2)}</small>` : ''}</td>
-            <td>${p.category || '-'} ➔ ${p.sub_category || '-'}</td>
-            <td>${p.brand || '-'}</td>
-            <td>${p.source || '-'}</td>
-            <td>
-                <button onclick='deleteProduct(${p.id})' style="color:red; background:none; border:none; cursor:pointer;">🗑️ Delete</button>
+// --- PRODUCTS CRUD ---
+async function loadAdminProducts() {
+    const { data } = await db.from('products').select('*').order('id', { ascending: false });
+    const tbody = document.getElementById("admin-product-table");
+    if (!data) return;
+    tbody.innerHTML = data.map(p => `
+        <tr style="border-bottom:1px solid #edf2f7;">
+            <td style="padding:8px;">${p.product_code || '-'}</td>
+            <td style="padding:8px;"><strong>${p.name}</strong></td>
+            <td style="padding:8px;"><span style="background:#e6f7f0; color:#0baf65; padding:2px 6px; border-radius:4px; font-size:0.7rem; font-weight:bold;">${p.business || ''}</span> / ${p.category}</td>
+            <td style="padding:8px;">K ${parseFloat(p.deal_price || p.price).toFixed(2)}</td>
+            <td style="padding:8px; text-align:center;">
+                <button onclick='editProduct(${JSON.stringify(p)})' style="background:#3182ce; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;">Edit</button>
+                <button onclick="deleteProduct(${p.id})" style="background:#e53e3e; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;">Del</button>
             </td>
         </tr>
     `).join('');
 }
 
-async function saveProduct(event) {
-    event.preventDefault();
+async function saveProduct(e) {
+    e.preventDefault();
+    const id = document.getElementById("product-id").value;
     const payload = {
-        product_code: document.getElementById("prod-code").value,
-        name: document.getElementById("prod-name").value,
-        price: parseFloat(document.getElementById("prod-price").value),
-        deal_price: document.getElementById("prod-deal-price").value ? parseFloat(document.getElementById("prod-deal-price").value) : null,
-        category: document.getElementById("prod-category").value,
-        sub_category: document.getElementById("prod-subcategory").value,
-        brand: document.getElementById("prod-brand").value,
-        source: document.getElementById("prod-source").value,
-        image_url: document.getElementById("prod-image").value
+        name: document.getElementById("p-name").value.trim(),
+        product_code: document.getElementById("p-code").value.trim() || null,
+        business: document.getElementById("p-business").value,
+        category: document.getElementById("p-category").value.trim(),
+        sub_category: document.getElementById("p-subcategory").value.trim() || null,
+        price: parseFloat(document.getElementById("p-price").value),
+        deal_price: document.getElementById("p-deal-price").value ? parseFloat(document.getElementById("p-deal-price").value) : null,
+        brand: document.getElementById("p-brand").value.trim() || null,
+        image_url: document.getElementById("p-image").value.trim() || null,
+        is_active: document.getElementById("p-active").checked
     };
+    const query = id ? db.from('products').update(payload).eq('id', id) : db.from('products').insert([payload]);
+    const { error } = await query;
+    if (error) alert("Error: " + error.message);
+    else { alert("Saved!"); resetProductForm(); loadAdminProducts(); }
+}
 
-    const { error } = await db.from('products').insert([payload]);
-    if (error) {
-        alert("Error saving product: " + error.message);
-    } else {
-        alert("Product saved successfully!");
-        document.getElementById("product-form").reset();
-        fetchAdminProducts();
-    }
+function editProduct(p) {
+    document.getElementById("product-id").value = p.id;
+    document.getElementById("p-name").value = p.name;
+    document.getElementById("p-code").value = p.product_code || '';
+    document.getElementById("p-business").value = p.business || '';
+    document.getElementById("p-category").value = p.category || '';
+    document.getElementById("p-subcategory").value = p.sub_category || '';
+    document.getElementById("p-price").value = p.price;
+    document.getElementById("p-deal-price").value = p.deal_price || '';
+    document.getElementById("p-brand").value = p.brand || '';
+    document.getElementById("p-image").value = p.image_url || '';
+    document.getElementById("p-active").checked = p.is_active;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 async function deleteProduct(id) {
-    if (confirm("Delete this product from master?")) {
-        await db.from('products').delete().eq('id', id);
-        fetchAdminProducts();
-    }
+    if (!confirm("Delete product?")) return;
+    await db.from('products').delete().eq('id', id);
+    loadAdminProducts();
 }
 
-// 🚚 ORDER FULFILLMENT HUB LOADER
-async function loadOrderFulfillmentHub() {
-    const { data: orders, error } = await db
-        .from('orders')
-        .select('*')
-        .order('id', { ascending: false });
+function resetProductForm() {
+    document.getElementById("admin-product-form").reset();
+    document.getElementById("product-id").value = "";
+}
 
-    const container = document.getElementById("fulfillment-orders-list");
-    if (!container) return;
+// --- BANNERS CRUD ---
+async function loadAdminBanners() {
+    const { data } = await db.from('banners').select('*').order('id', { ascending: false });
+    const container = document.getElementById("admin-banners-list");
+    if (!data) return;
+    container.innerHTML = data.map(b => `
+        <div style="border:1px solid #e2e8f0; padding:10px; border-radius:8px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
+            <div>
+                <strong>${b.title}</strong><br><small>${b.subtitle || ''}</small>
+            </div>
+            <button onclick="deleteBanner(${b.id})" style="background:#e53e3e; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;">Delete</button>
+        </div>
+    `).join('');
+}
 
-    if (error || !orders || orders.length === 0) {
-        container.innerHTML = `<tr><td colspan="6" style="padding: 20px; text-align: center; color: #718096;">No orders found.</td></tr>`;
-        return;
+async function saveBanner(e) {
+    e.preventDefault();
+    let parsedItems = null;
+    try {
+        const rawJson = document.getElementById("b-items-json").value.trim();
+        if (rawJson) parsedItems = JSON.parse(rawJson);
+    } catch (err) {
+        return alert("Invalid JSON format in Items JSON field!");
     }
 
-    container.innerHTML = orders.map(o => {
+    const payload = {
+        title: document.getElementById("b-title").value.trim(),
+        subtitle: document.getElementById("b-subtitle").value.trim(),
+        image_url: document.getElementById("b-image").value.trim(),
+        items_json: parsedItems,
+        is_active: document.getElementById("b-active").checked
+    };
+
+    const { error } = await db.from('banners').insert([payload]);
+    if (error) alert("Error: " + error.message);
+    else { alert("Banner Combo added!"); document.getElementById("admin-banner-form").reset(); loadAdminBanners(); }
+}
+
+async function deleteBanner(id) {
+    await db.from('banners').delete().eq('id', id);
+    loadAdminBanners();
+}
+
+function resetBannerForm() { document.getElementById("admin-banner-form").reset(); }
+
+// --- FULFILLMENT ORDERS (WITH CUSTOMER JOIN & CENTERED EXPANSION) ---
+async function loadAdminOrders() {
+    const { data: orders } = await db.from('orders').select('*').order('id', { ascending: false });
+    const { data: customers } = await db.from('customers').select('*');
+    
+    const customerMap = {};
+    if (customers) {
+        customers.forEach(c => { customerMap[c.phone_number] = c; });
+    }
+
+    const tbody = document.getElementById("admin-orders-table");
+    if (!orders) return;
+
+    tbody.innerHTML = orders.map(o => {
         const orderDate = o.created_at ? new Date(o.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-';
         const orderNum = o.order_number || (`#ORD-${o.id}`);
-        const customerTitle = o.customer_title || '';
-        const customerName = `${customerTitle} ${o.customer_first_name || ''} ${o.customer_last_name || ''}`.trim() || o.customer_phone || 'Valued Shopper';
+        
+        // Match customer details from the customers table via phone number
+        const cust = customerMap[o.customer_phone] || {};
+        const title = cust.title || '';
+        const firstName = cust.first_name || '';
+        const lastName = cust.last_name || '';
+        const customerName = `${title} ${firstName} ${lastName}`.trim() || 'Valued Shopper';
+        
         const items = o.order_items_json || [];
 
         return `
-            <tr style="border-bottom: 1px solid #edf2f7; background: #fff;">
-                <td style="padding: 12px; font-weight: bold; color: #2d3748;">#${o.id}</td>
-                <td style="padding: 12px; color: #4a5568; white-space: nowrap;">${orderDate}</td>
-                <td style="padding: 12px;">
+            <tr style="border-bottom:1px solid #edf2f7; background: #fff;">
+                <td style="padding:10px; font-weight: bold; color: #2d3748;">#${o.id}</td>
+                <td style="padding:10px; color: #4a5568; white-space: nowrap;">${orderDate}</td>
+                <td style="padding:10px;">
                     <button type="button" onclick="toggleOrderDetails(${o.id})" style="background: #ebf8ff; color: #2b6cb0; border: 1px solid #bee3f8; padding: 4px 8px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 0.8rem;">
                         📋 ${orderNum} ▾
                     </button>
                 </td>
-                <td style="padding: 12px;">
+                <td style="padding:10px;">
                     <strong>${customerName}</strong><br>
                     <small style="color: #718096;">📱 ${o.customer_phone || '-'}</small><br>
                     <small style="color: #e53e3e;">📍 ${o.delivery_location || '-'}</small>
                 </td>
-                <td style="padding: 12px;">
+                <td style="padding:10px;">
                     <strong style="color: #0baf65;">K ${parseFloat(o.total_amount).toFixed(2)}</strong><br>
-                    <small style="color: #4a5568;">${o.payment_method || 'CoD'} (${o.payment_status || 'Pending'})</small>
+                    <small style="color: #4a5568;">${o.payment_method || 'Mobile Money'} (${o.payment_status || 'Pending'})</small>
                 </td>
-                <td style="padding: 12px;">
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <select id="status-${o.id}" class="form-input" style="padding: 6px; font-size: 0.8rem; border-radius: 6px; border: 1px solid #cbd5e0;">
+                <td style="padding:10px;">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <select id="status-${o.id}" class="form-input" style="padding: 4px; font-size: 0.75rem;">
                             <option value="Order Placed" ${o.fulfillment_status === 'Order Placed' ? 'selected' : ''}>Order Placed</option>
-                            <option value="Processing" ${o.fulfillment_status === 'Processing' ? 'selected' : ''}>Processing</option>
-                            <option value="Out for Delivery" ${o.fulfillment_status === 'Out for Delivery' ? 'selected' : ''}>Out for Delivery</option>
+                            <option value="Aggregating" ${o.fulfillment_status === 'Aggregating' ? 'selected' : ''}>Aggregating</option>
+                            <option value="Dispatched" ${o.fulfillment_status === 'Dispatched' ? 'selected' : ''}>Dispatched</option>
                             <option value="Delivered" ${o.fulfillment_status === 'Delivered' ? 'selected' : ''}>Delivered</option>
                             <option value="Cancelled" ${o.fulfillment_status === 'Cancelled' ? 'selected' : ''}>Cancelled</option>
                         </select>
-                        <button type="button" onclick="updateOrderStatus(${o.id})" style="background: #0baf65; color: white; border: none; padding: 6px 12px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 0.8rem;">
+                        <button type="button" onclick="updateFulfillmentStatus(${o.id})" style="background: #0baf65; color: white; border: none; padding: 5px 10px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 0.75rem;">
                             Save
                         </button>
                     </div>
                 </td>
             </tr>
-            <!-- Collapsible Details Row -->
+            <!-- Centered Collapsible Details Row -->
             <tr id="details-row-${o.id}" style="display: none; background: #f8fafc; border-bottom: 2px solid #e2e8f0;">
-                <td colspan="6" style="padding: 16px;">
-                    <div style="background: white; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; max-width: 700px;">
-                        <h4 style="margin: 0 0 8px 0; font-size: 0.85rem; color: #2d3748;">📦 Order Breakdown (${items.length} items)</h4>
-                        <table style="width: 100%; font-size: 0.8rem; border-collapse: collapse;">
+                <td colspan="6" style="padding: 14px; text-align: center;">
+                    <div style="background: white; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; max-width: 650px; margin: 0 auto; text-align: left;">
+                        <h4 style="margin: 0 0 8px 0; font-size: 0.82rem; color: #2d3748;">📦 Order Breakdown (${items.length} items)</h4>
+                        <table style="width: 100%; font-size: 0.78rem; border-collapse: collapse;">
                             <thead>
                                 <tr style="border-bottom: 1px solid #edf2f7; text-align: left; color: #718096;">
                                     <th style="padding: 4px;">Product Name</th>
@@ -158,11 +208,11 @@ async function loadOrderFulfillmentHub() {
                                     const totalVal = price * (item.qty || 1);
                                     return `
                                         <tr style="border-bottom: 1px solid #f7fafc;">
-                                            <td style="padding: 6px 4px; font-weight: 600;">${p.name || 'Item'}</td>
-                                            <td style="padding: 6px 4px; color: #718096;">${p.product_code || '-'}</td>
-                                            <td style="padding: 6px 4px; text-align: center;">${item.qty || 1}</td>
-                                            <td style="padding: 6px 4px; text-align: right;">K ${price.toFixed(2)}</td>
-                                            <td style="padding: 6px 4px; text-align: right; font-weight: bold; color: #0baf65;">K ${totalVal.toFixed(2)}</td>
+                                            <td style="padding: 5px 4px; font-weight: 600;">${p.name || 'Item'}</td>
+                                            <td style="padding: 5px 4px; color: #718096;">${p.product_code || '-'}</td>
+                                            <td style="padding: 5px 4px; text-align: center;">${item.qty || 1}</td>
+                                            <td style="padding: 5px 4px; text-align: right;">K ${price.toFixed(2)}</td>
+                                            <td style="padding: 5px 4px; text-align: right; font-weight: bold; color: #0baf65;">K ${totalVal.toFixed(2)}</td>
                                         </tr>
                                     `;
                                 }).join('')}
@@ -175,7 +225,6 @@ async function loadOrderFulfillmentHub() {
     }).join('');
 }
 
-// Toggle expansion of order item details
 function toggleOrderDetails(orderId) {
     const row = document.getElementById(`details-row-${orderId}`);
     if (row) {
@@ -183,22 +232,17 @@ function toggleOrderDetails(orderId) {
     }
 }
 
-// Save fulfillment status back to Supabase
-async function updateOrderStatus(orderId) {
+async function updateFulfillmentStatus(orderId) {
     const selectEl = document.getElementById(`status-${orderId}`);
     if (!selectEl) return;
 
     const newStatus = selectEl.value;
-
-    const { error } = await db
-        .from('orders')
-        .update({ fulfillment_status: newStatus })
-        .eq('id', orderId);
-
+    const { error } = await db.from('orders').update({ fulfillment_status: newStatus }).eq('id', orderId);
+    
     if (error) {
         alert("Failed to update status: " + error.message);
     } else {
         alert(`Order #${orderId} fulfillment status updated to "${newStatus}" successfully!`);
-        loadOrderFulfillmentHub();
+        loadAdminOrders();
     }
 }
