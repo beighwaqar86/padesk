@@ -97,6 +97,7 @@ function calculatePricing(source) {
     const costInput = document.getElementById("p-cost-price");
     const markupInput = document.getElementById("p-markup");
     const priceInput = document.getElementById("p-price");
+    const dealPriceInput = document.getElementById("p-deal-price");
 
     if (!costInput || !markupInput || !priceInput) return;
 
@@ -107,11 +108,16 @@ function calculatePricing(source) {
     if (cost <= 0) return; // Need a cost base to calculate margins
 
     if (source === 'markup' || source === 'cost') {
-        // Forward Calc: User changes Markup or Cost -> Calculate Selling Price
+        // Forward Calc: User changes Markup or Cost -> Calculate Selling Prices
         price = cost + (cost * (markup / 100));
         priceInput.value = price.toFixed(2);
+        
+        // Auto-populate Deal Price to match, preventing accidental below-cost errors
+        if (dealPriceInput) {
+            dealPriceInput.value = price.toFixed(2);
+        }
     } else if (source === 'price') {
-        // Reverse Calc: User manually types Selling Price -> Calculate Markup
+        // Reverse Calc: User manually types Regular Selling Price -> Calculate Markup
         markup = ((price - cost) / cost) * 100;
         markupInput.value = markup.toFixed(2);
     }
