@@ -18,7 +18,7 @@
         </div>
 
         <!-- Navigation Tabs -->
-        <div style="display: flex; gap: 10px; margin-bottom: 24px;">
+        <div style="display: flex; gap: 10px; margin-bottom: 24px; flex-wrap: wrap;">
             <button type="button" onclick="switchAdminTab('products')" id="tab-btn-products" style="background: #0baf65; color: white; border: none; padding: 10px 16px; border-radius: 8px; font-weight: bold; cursor: pointer;">📦 Products Master</button>
             <button type="button" onclick="switchAdminTab('purchases')" id="tab-btn-purchases" style="background: #edf2f7; color: #4a5568; border: none; padding: 10px 16px; border-radius: 8px; font-weight: bold; cursor: pointer;">📥 Purchases & Stock</button>
             <button type="button" onclick="switchAdminTab('banners')" id="tab-btn-banners" style="background: #edf2f7; color: #4a5568; border: none; padding: 10px 16px; border-radius: 8px; font-weight: bold; cursor: pointer;">⚡ Ready-Made Combos</button>
@@ -48,7 +48,7 @@
 
         <!-- TAB 2: PURCHASES & STOCK INTAKE -->
         <div id="admin-tab-purchases" class="admin-tab-content" style="display: none;">
-            <div class="admin-card" style="background: white; padding: 20px; border-radius: 10px; border: 1px solid #e2e8f0; margin-bottom: 20px;">
+            <div style="background: white; padding: 20px; border-radius: 10px; border: 1px solid #e2e8f0; margin-bottom: 20px;">
                 <h3 style="margin-top: 0; color: #1a202c; font-size: 1.1rem;">📦 Record New Stock Purchase</h3>
                 <form id="purchase-form" onsubmit="recordPurchase(event)" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; align-items: flex-end;">
                     
