@@ -442,8 +442,8 @@ function startAutoSlide(totalSlides) {
         if (!container) return;
 
         currentSlide = (currentSlide + 1) % totalSlides;
-        const slideWidth = container.querySelector('.banner-card')?.offsetWidth || 280;
-        container.scrollTo({ left: (slideWidth + 12) * currentSlide, behavior: 'smooth' });
+        const slideWidth = container.clientWidth; // Takes exact 100% container width
+        container.scrollTo({ left: slideWidth * currentSlide, behavior: 'smooth' });
     }, 4000);
 }
 
@@ -451,8 +451,8 @@ function syncDotsOnScroll(totalSlides) {
     const container = document.getElementById("banner-carousel");
     if (!container) return;
 
-    const slideWidth = container.querySelector('.banner-card')?.offsetWidth || 280;
-    const activeIdx = Math.round(container.scrollLeft / (slideWidth + 12));
+    const slideWidth = container.clientWidth;
+    const activeIdx = Math.round(container.scrollLeft / slideWidth);
 
     for (let i = 0; i < totalSlides; i++) {
         const dot = document.getElementById(`dot-${i}`);
