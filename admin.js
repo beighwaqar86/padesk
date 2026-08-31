@@ -237,12 +237,22 @@ async function updateFulfillmentStatus(orderId) {
     if (!selectEl) return;
 
     const newStatus = selectEl.value;
-    const { error } = await db.from('orders').update({ fulfillment_status: newStatus }).eq('id', orderId);
+    
+    // Explicitly target and update the order record in Supabase
+    const { data, error } = await db
+        .from('orders')
+        .update({ fulfillment_status: newStatus })
+        .eq('id', orderId)
+        .select();
     
     if (error) {
-        alert("Failed to update status: " + error.message);
+        alert("Database Error: " + error.message);
+        console.error("Supabase update error:", error);
+    } else if (!data || data.length === 0) {
+        alert("Update blocked! Check your Supabase RLS policies for the 'orders' table.");
     } else {
         alert(`Order #${orderId} fulfillment status updated to "${newStatus}" successfully!`);
         loadAdminOrders();
     }
+}
 }
