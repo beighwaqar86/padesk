@@ -3,12 +3,16 @@ const SUPABASE_ANON_KEY = "sb_publishable_j_MkiOlGUZOBsR8TSxIM1w_pnQ_B1xx";
 let db;
 
 window.onload = function() {
-    db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    loadAdminProducts();
-    loadAdminBanners();
-    loadAdminOrders();
-    loadPurchaseProductDropdown();
-    loadStockHoldings(); // Added initial call
+    try {
+        db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        loadAdminProducts();
+        loadAdminBanners();
+        loadAdminOrders();
+        loadPurchaseProductDropdown();
+        loadStockHoldings();
+    } catch (err) {
+        console.error("Initialization error:", err);
+    }
 };
 
 function switchAdminTab(tabName) {
@@ -31,95 +35,89 @@ function switchAdminTab(tabName) {
         loadPurchaseProductDropdown();
     }
     if (tabName === 'stock') {
-        loadStockHoldings(); // Refresh stock holdings when clicking the tab
-    }
-}
-
-async function loadStockHoldings() {
-    const tbody = document.getElementById("admin-stock-holdings-table");
-    if (!tbody) return;
-
-    try {
-        const { data: products, error } = await db.from('products').select('*').order('name');
-        if (error) throw error;
-
-        if (!products || products.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" style="padding: 15px; text-align: center;">No products found in inventory.</td></tr>';
-            return;
-        }
-
-        let totalInventoryCapital = 0;
-
-        tbody.innerHTML = products.map(p => {
-            const qty = p.stock_qty || 0;
-            const unitCost = parseFloat(p.cost_price || 0);
-            const totalVal = qty * unitCost;
-            totalInventoryCapital += totalVal;
-
-            const stockBadgeStyle = qty <= 0 
-                ? 'background: #fed7d7; color: #c53030; padding: 2px 8px; border-radius: 4px; font-weight: bold;'
-                : 'background: #e6f7f0; color: #0baf65; padding: 2px 8px; border-radius: 4px; font-weight: bold;';
-
-            return `
-                <tr style="border-bottom: 1px solid #edf2f7;">
-                    <td style="padding: 10px; color: #4a5568;">${p.product_code || '-'}</td>
-                    <td style="padding: 10px; font-weight: 600;">${p.name}</td>
-                    <td style="padding: 10px; text-align: center;"><span style="${stockBadgeStyle}">${qty} units</span></td>
-                    <td style="padding: 10px; text-align: right;">K ${unitCost.toFixed(2)}</td>
-                    <td style="padding: 10px; text-align: right; font-weight: bold;">K ${totalVal.toFixed(2)}</td>
-                </tr>
-            `;
-        }).join('') + `
-            <tr style="background: #f8fafc; font-weight: bold; border-top: 2px solid #cbd5e0;">
-                <td colspan="4" style="padding: 12px; text-align: right;">Total Inventory Asset Value:</td>
-                <td style="padding: 12px; text-align: right; color: #0baf65;">K ${totalInventoryCapital.toFixed(2)}</td>
-            </tr>
-        `;
-    } catch (err) {
-        console.error("Error loading stock holdings:", err);
-        tbody.innerHTML = `<tr><td colspan="5" style="padding: 15px; text-align: center; color: red;">Failed to load stock data: ${err.message}</td></tr>`;
-    }
-}
-
-    const targetTab = document.getElementById(`admin-tab-${tabName}`);
-    const targetBtn = document.getElementById(`tab-btn-${tabName}`);
-
-    if (targetTab) targetTab.style.display = 'block';
-    if (targetBtn) {
-        targetBtn.style.background = '#0baf65';
-        targetBtn.style.color = 'white';
-    }
-
-    // Refresh product list for purchases when switching to the tab
-    if (tabName === 'purchases') {
-        loadPurchaseProductDropdown();
+        loadStockHoldings();
     }
 }
 
 // --- PRODUCTS CRUD ---
 async function loadAdminProducts() {
-    const { data } = await db.from('products').select('*').order('id', { ascending: false });
     const tbody = document.getElementById("admin-product-table");
-    if (!data || !tbody) return;
-    tbody.innerHTML = data.map(p => `
-        <tr style="border-bottom:1px solid #edf2f7;">
-            <td style="padding:8px;">${p.product_code || '-'}</td>
-            <td style="padding:8px;"><strong>${p.name}</strong></td>
-            <td style="padding:8px;"><span style="background:#e6f7f0; color:#0baf65; padding:2px 6px; border-radius:4px; font-size:0.7rem; font-weight:bold;">${p.business || ''}</span> / ${p.category}</td>
-            <td style="padding:8px;">K ${parseFloat(p.deal_price || p.price).toFixed(2)}</td>
-            <td style="padding:8px; text-align:center;">
-                <button onclick='editProduct(${JSON.stringify(p)})' style="background:#3182ce; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;">Edit</button>
-                <button onclick="deleteProduct(${p.id})" style="background:#e53e3e; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;">Del</button>
-            </td>
-        </tr>
-    `).join('');
+    if (!tbody) return;
+
+    try {
+        const { data, error } = await db.from('products').select('*').order('id', { ascending: false });
+        if (error) throw error;
+
+        if (!data || data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="padding: 20px; text-align: center;">No products found.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = data.map(p => `
+            <tr style="border-bottom:1px solid #edf2f7;">
+                <td style="padding:8px;">${p.product_code || '-'}</td>
+                <td style="padding:8px;"><strong>${p.name}</strong></td>
+                <td style="padding:8px;"><span style="background:#e6f7f0; color:#0baf65; padding:2px 6px; border-radius:4px; font-size:0.7rem; font-weight:bold;">${p.business || ''}</span> / ${p.category}</td>
+                <td style="padding:8px;">K ${parseFloat(p.deal_price || p.price).toFixed(2)}</td>
+                <td style="padding:8px; text-align:center;">
+                    <button type="button" onclick='editProduct(${JSON.stringify(p)})' style="background:#3182ce; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;">Edit</button>
+                    <button type="button" onclick="deleteProduct(${p.id})" style="background:#e53e3e; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;">Del</button>
+                </td>
+            </tr>
+        `).join('');
+    } catch (err) {
+        console.error("Error loading products:", err);
+        tbody.innerHTML = '<tr><td colspan="5" style="padding: 20px; text-align: center; color: red;">Failed to load products.</td></tr>';
+    }
+}
+
+async function saveProduct(e) {
+    e.preventDefault();
+    const id = document.getElementById("product-id").value;
+    const payload = {
+        name: document.getElementById("p-name").value.trim(),
+        product_code: document.getElementById("p-code").value.trim() || null,
+        business: document.getElementById("p-business").value,
+        category: document.getElementById("p-category").value.trim(),
+        price: parseFloat(document.getElementById("p-price").value),
+        deal_price: document.getElementById("p-deal-price").value ? parseFloat(document.getElementById("p-deal-price").value) : null,
+        is_active: true
+    };
+    
+    const query = id ? db.from('products').update(payload).eq('id', id) : db.from('products').insert([payload]);
+    const { error } = await query;
+    if (error) {
+        alert("Error: " + error.message);
+    } else {
+        alert("Product saved successfully!");
+        resetProductForm();
+        loadAdminProducts();
+        loadStockHoldings();
+    }
+}
+
+function editProduct(p) {
+    document.getElementById("product-id").value = p.id;
+    document.getElementById("p-name").value = p.name;
+    document.getElementById("p-code").value = p.product_code || '';
+    document.getElementById("p-business").value = p.business || '';
+    document.getElementById("p-category").value = p.category || '';
+    document.getElementById("p-price").value = p.price;
+    document.getElementById("p-deal-price").value = p.deal_price || '';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 async function deleteProduct(id) {
     if (!confirm("Delete product?")) return;
     await db.from('products').delete().eq('id', id);
     loadAdminProducts();
+    loadStockHoldings();
     loadPurchaseProductDropdown();
+}
+
+function resetProductForm() {
+    document.getElementById("admin-product-form").reset();
+    document.getElementById("product-id").value = "";
 }
 
 // --- PURCHASES MODULE ---
@@ -184,6 +182,7 @@ async function recordPurchase(event) {
         alert("✅ Purchase recorded successfully! Stock and acquisition cost updated.");
         document.getElementById("purchase-form").reset();
         loadAdminProducts();
+        loadStockHoldings();
         loadPurchaseProductDropdown();
 
     } catch (err) {
@@ -192,7 +191,54 @@ async function recordPurchase(event) {
     }
 }
 
-// --- BANNERS CRUD ---
+// --- STOCK ON HAND ---
+async function loadStockHoldings() {
+    const tbody = document.getElementById("admin-stock-holdings-table");
+    if (!tbody) return;
+
+    try {
+        const { data: products, error } = await db.from('products').select('*').order('name');
+        if (error) throw error;
+
+        if (!products || products.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="padding: 15px; text-align: center;">No products found in inventory.</td></tr>';
+            return;
+        }
+
+        let totalInventoryCapital = 0;
+
+        tbody.innerHTML = products.map(p => {
+            const qty = p.stock_qty || 0;
+            const unitCost = parseFloat(p.cost_price || 0);
+            const totalVal = qty * unitCost;
+            totalInventoryCapital += totalVal;
+
+            const stockBadgeStyle = qty <= 0 
+                ? 'background: #fed7d7; color: #c53030; padding: 2px 8px; border-radius: 4px; font-weight: bold;'
+                : 'background: #e6f7f0; color: #0baf65; padding: 2px 8px; border-radius: 4px; font-weight: bold;';
+
+            return `
+                <tr style="border-bottom: 1px solid #edf2f7;">
+                    <td style="padding: 10px; color: #4a5568;">${p.product_code || '-'}</td>
+                    <td style="padding: 10px; font-weight: 600;">${p.name}</td>
+                    <td style="padding: 10px; text-align: center;"><span style="${stockBadgeStyle}">${qty} units</span></td>
+                    <td style="padding: 10px; text-align: right;">K ${unitCost.toFixed(2)}</td>
+                    <td style="padding: 10px; text-align: right; font-weight: bold;">K ${totalVal.toFixed(2)}</td>
+                </tr>
+            `;
+        }).join('') + `
+            <tr style="background: #f8fafc; font-weight: bold; border-top: 2px solid #cbd5e0;">
+                <td colspan="4" style="padding: 12px; text-align: right;">Total Inventory Asset Value:</td>
+                <td style="padding: 12px; text-align: right; color: #0baf65;">K ${totalInventoryCapital.toFixed(2)}</td>
+            </tr>
+        `;
+    } catch (err) {
+        console.error("Error loading stock holdings:", err);
+        tbody.innerHTML = `<tr><td colspan="5" style="padding: 15px; text-align: center; color: red;">Failed to load stock data.</td></tr>`;
+    }
+}
+
+// --- BANNERS ---
 async function loadAdminBanners() {
     const { data } = await db.from('banners').select('*').order('id', { ascending: false });
     const container = document.getElementById("admin-banners-list");
@@ -202,7 +248,7 @@ async function loadAdminBanners() {
             <div>
                 <strong>${b.title}</strong><br><small>${b.subtitle || ''}</small>
             </div>
-            <button onclick="deleteBanner(${b.id})" style="background:#e53e3e; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;">Delete</button>
+            <button type="button" onclick="deleteBanner(${b.id})" style="background:#e53e3e; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;">Delete</button>
         </div>
     `).join('');
 }
@@ -230,11 +276,7 @@ async function loadAdminOrders() {
         const orderNum = o.order_number || (`#ORD-${o.id}`);
         
         const cust = customerMap[o.customer_phone] || {};
-        const title = cust.title || '';
-        const firstName = cust.first_name || '';
-        const lastName = cust.last_name || '';
-        const customerName = `${title} ${firstName} ${lastName}`.trim() || 'Valued Shopper';
-        
+        const customerName = `${cust.title || ''} ${cust.first_name || ''} ${cust.last_name || ''}`.trim() || 'Valued Shopper';
         const items = o.order_items_json || [];
 
         return `
