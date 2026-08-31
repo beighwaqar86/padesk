@@ -858,14 +858,37 @@ async function executeFinalOrderSubmission() {
 
     try {
         const btn = document.getElementById("checkout-btn");
-        btn.innerText = "⏳ Submitting Order...";
-        btn.disabled = true;
+        if (btn) {
+            btn.innerText = "⏳ Submitting Order...";
+            btn.disabled = true;
+        }
 
         const items = Object.values(cart);
         const totalPrice = items.reduce((sum, item) => {
             const p = item.product.deal_price ? item.product.deal_price : item.product.price;
             return sum + (parseFloat(p) * item.qty);
         }, 0);
+
+        // 1. FINANCE HEAD GUARDRAIL: Check Selling Price vs Cost Price & Stock Availability
+        for (const item of items) {
+            const prodId = item.product.id;
+            const orderQty = item.qty;
+            const effectivePrice = parseFloat(item.product.deal_price || item.product.price || 0);
+            const itemCost = parseFloat(item.product.cost_price || 0);
+
+            // Guardrail A: Zero Selling Below Cost
+            if (effectivePrice < itemCost) {
+                throw new Error(`Pricing violation: "${item.product.name}" is priced at K ${effectivePrice.toFixed(2)} which is below its cost price of K ${itemCost.toFixed(2)}.`);
+            }
+
+            // Guardrail B: Stock Availability Check
+            const { data: liveProd, error: stockCheckErr } = await db.from('products').select('stock_qty, name').eq('id', prodId).single();
+            if (stockCheckErr || !liveProd) throw new Error(`Could not verify stock for ${item.product.name}`);
+
+            if ((liveProd.stock_qty || 0) < orderQty) {
+                throw new Error(`Insufficient stock for "${liveProd.name}". Only ${liveProd.stock_qty || 0} units available.`);
+            }
+        }
 
         const contactPhone = document.getElementById("customer-phone").value.trim();
         const cTitle = document.getElementById("customer-title").value;
@@ -875,10 +898,10 @@ async function executeFinalOrderSubmission() {
         
         const paymentMethodSelect = document.getElementById("payment-method-select");
         const paymentMethod = paymentMethodSelect ? paymentMethodSelect.value : "Cash on Delivery";
-
         const initialPaymentStatus = paymentMethod === 'Cash on Delivery' ? 'Pending Collection' : 'Pending Gateway';
 
-        const { error: custError } = await db.from('customers').upsert([{
+        // Upsert Customer Record
+        await db.from('customers').upsert([{
             phone_number: contactPhone,
             title: cTitle,
             first_name: cFirstName,
@@ -887,9 +910,7 @@ async function executeFinalOrderSubmission() {
             last_order_at: new Date().toISOString()
         }], { onConflict: 'phone_number' });
 
-        if (custError) throw new Error("Customers Table Error: " + custError.message);
-
-        // 1. Insert Order
+        // 2. Insert Order
         const { data: newOrder, error: orderError } = await db.from('orders').insert([{
             customer_phone: contactPhone,
             delivery_location: selectedOffice,
@@ -903,10 +924,20 @@ async function executeFinalOrderSubmission() {
 
         if (orderError) throw new Error("Orders Table Error: " + orderError.message);
 
-        // 2. Automatically Save / Link Custom Customer Combo (Duplicate Prevented)
-        await saveCustomerCustomCombo(contactPhone, items);
+        // 3. AUTOMATED INVENTORY DEDUCTION (Deduct stock for each purchased SKU)
+        for (const item of items) {
+            const prodId = item.product.id;
+            const orderQty = item.qty;
 
-        // Instantly reload custom combos on screen
+            // Fetch latest stock to prevent race conditions
+            const { data: currentP } = await db.from('products').select('stock_qty').eq('id', prodId).single();
+            const updatedStock = Math.max(0, (currentP.stock_qty || 0) - orderQty);
+
+            await db.from('products').update({ stock_qty: updatedStock }).eq('id', prodId);
+        }
+
+        // Save Custom Combo Template & Reset Cart
+        await saveCustomerCustomCombo(contactPhone, items);
         loadCustomerCustomCombos(contactPhone);
 
         localStorage.setItem("padesk_phone", contactPhone);
@@ -920,11 +951,11 @@ async function executeFinalOrderSubmission() {
         autoPopulateSavedCustomer();
         
         const displayOrderNo = newOrder && newOrder.order_number ? newOrder.order_number : "Successfully";
-        alert(`Zikomo ${cTitle} ${cLastName || cFirstName}! Order ${displayOrderNo} has been placed via ${paymentMethod}. Your custom combo has been saved for easy reordering!`);
+        alert(`Zikomo ${cTitle} ${cLastName || cFirstName}! Order ${displayOrderNo} has been placed. Stock levels have been automatically updated.`);
 
     } catch (error) {
         console.error(error);
-        alert("Action Failed:\n" + error.message);
+        alert("Order Submission Blocked:\n" + error.message);
         updateCartUI();
     }
 }
