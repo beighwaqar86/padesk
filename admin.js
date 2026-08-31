@@ -245,41 +245,35 @@ async function loadPurchasesHistory() {
         if (error) throw error;
 
         if (!purchases || purchases.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" style="padding: 15px; text-align: center; color: #718096;">No purchase orders recorded yet.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="8" style="padding: 15px; text-align: center; color: #718096;">No purchase orders recorded yet.</td></tr>';
             return;
         }
 
         tbody.innerHTML = purchases.map(p => {
-            let poCode = p.po_code;
-            const invDate = p.invoice_date || p.purchase_date;
-
-            if (!poCode) {
-                const pDate = invDate ? new Date(invDate) : new Date(p.created_at || Date.now());
-                const day = String(pDate.getDate()).padStart(2, '0');
-                const month = String(pDate.getMonth() + 1).padStart(2, '0');
-                const year = pDate.getFullYear();
-                poCode = `PO${day}${month}${year}${String(p.id).padStart(2, '0')}`;
-            }
+            // Strictly pull from DB; leave empty if not present on legacy records
+            const poCode = p.po_code || '-';
+            const invDate = p.invoice_date || p.purchase_date || '-';
+            const invRef = p.invoice_ref || '-';
 
             const prodName = p.products ? p.products.name : 'Unknown Product';
-            const totalCost = p.qty_received * parseFloat(p.purchase_unit_cost);
-            const formattedDate = invDate || (p.created_at ? p.created_at.split('T')[0] : '-');
+            const totalCost = (p.qty_received || 0) * parseFloat(p.purchase_unit_cost || 0);
 
             return `
                 <tr style="border-bottom: 1px solid #edf2f7;">
                     <td style="padding: 9px; font-weight: bold; color: #2b6cb0;">${poCode}</td>
-                    <td style="padding: 9px; color: #4a5568; white-space: nowrap;">${formattedDate}</td>
-                    <td style="padding: 9px;">${p.supplier_name}</td>
+                    <td style="padding: 9px; color: #4a5568; white-space: nowrap;">${invDate}</td>
+                    <td style="padding: 9px; color: #4a5568; font-weight: 500;">${invRef}</td>
+                    <td style="padding: 9px;">${p.supplier_name || '-'}</td>
                     <td style="padding: 9px; font-weight: 600;">${prodName}</td>
-                    <td style="padding: 9px; text-align: center;">${p.qty_received}</td>
-                    <td style="padding: 9px; text-align: right;">K ${parseFloat(p.purchase_unit_cost).toFixed(2)}</td>
+                    <td style="padding: 9px; text-align: center;">${p.qty_received || 0}</td>
+                    <td style="padding: 9px; text-align: right;">K ${parseFloat(p.purchase_unit_cost || 0).toFixed(2)}</td>
                     <td style="padding: 9px; text-align: right; font-weight: bold; color: #0baf65;">K ${totalCost.toFixed(2)}</td>
                 </tr>
             `;
         }).join('');
     } catch (err) {
         console.error("Error loading purchases history:", err);
-        tbody.innerHTML = `<tr><td colspan="7" style="padding: 15px; text-align: center; color: red;">Failed to load purchase history.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" style="padding: 15px; text-align: center; color: red;">Failed to load purchase history.</td></tr>`;
     }
 }
 
