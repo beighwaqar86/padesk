@@ -341,4 +341,19 @@ async function recordExpense(event) {
         alert("Failed to record expense: " + err.message);
     }
 }
+    async function loadPurchaseProductDropdown() {
+    const selectEl = document.getElementById("purchase-product-select");
+    if (!selectEl) return;
+
+    try {
+        const { data: products, error } = await db.from('products').select('id, name, product_code, cost_price').order('name');
+        if (error) throw error;
+
+        selectEl.innerHTML = '<option value="">-- Choose Product --</option>' + products.map(p => `
+            <option value="${p.id}">${p.name} (Code: ${p.product_code || '-'} | Current Cost: K ${parseFloat(p.cost_price || 0).toFixed(2)})</option>
+        `).join('');
+    } catch (err) {
+        console.error("Error loading product dropdown:", err);
+    }
+}
 }
