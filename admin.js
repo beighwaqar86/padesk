@@ -8,6 +8,7 @@ window.onload = function() {
     loadAdminBanners();
     loadAdminOrders();
     loadPurchaseProductDropdown();
+    loadStockHoldings(); // Added initial call
 };
 
 function switchAdminTab(tabName) {
@@ -16,6 +17,69 @@ function switchAdminTab(tabName) {
         btn.style.background = '#edf2f7';
         btn.style.color = '#4a5568';
     });
+
+    const targetTab = document.getElementById(`admin-tab-${tabName}`);
+    const targetBtn = document.getElementById(`tab-btn-${tabName}`);
+
+    if (targetTab) targetTab.style.display = 'block';
+    if (targetBtn) {
+        targetBtn.style.background = '#0baf65';
+        targetBtn.style.color = 'white';
+    }
+
+    if (tabName === 'purchases') {
+        loadPurchaseProductDropdown();
+    }
+    if (tabName === 'stock') {
+        loadStockHoldings(); // Refresh stock holdings when clicking the tab
+    }
+}
+
+async function loadStockHoldings() {
+    const tbody = document.getElementById("admin-stock-holdings-table");
+    if (!tbody) return;
+
+    try {
+        const { data: products, error } = await db.from('products').select('*').order('name');
+        if (error) throw error;
+
+        if (!products || products.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="padding: 15px; text-align: center;">No products found in inventory.</td></tr>';
+            return;
+        }
+
+        let totalInventoryCapital = 0;
+
+        tbody.innerHTML = products.map(p => {
+            const qty = p.stock_qty || 0;
+            const unitCost = parseFloat(p.cost_price || 0);
+            const totalVal = qty * unitCost;
+            totalInventoryCapital += totalVal;
+
+            const stockBadgeStyle = qty <= 0 
+                ? 'background: #fed7d7; color: #c53030; padding: 2px 8px; border-radius: 4px; font-weight: bold;'
+                : 'background: #e6f7f0; color: #0baf65; padding: 2px 8px; border-radius: 4px; font-weight: bold;';
+
+            return `
+                <tr style="border-bottom: 1px solid #edf2f7;">
+                    <td style="padding: 10px; color: #4a5568;">${p.product_code || '-'}</td>
+                    <td style="padding: 10px; font-weight: 600;">${p.name}</td>
+                    <td style="padding: 10px; text-align: center;"><span style="${stockBadgeStyle}">${qty} units</span></td>
+                    <td style="padding: 10px; text-align: right;">K ${unitCost.toFixed(2)}</td>
+                    <td style="padding: 10px; text-align: right; font-weight: bold;">K ${totalVal.toFixed(2)}</td>
+                </tr>
+            `;
+        }).join('') + `
+            <tr style="background: #f8fafc; font-weight: bold; border-top: 2px solid #cbd5e0;">
+                <td colspan="4" style="padding: 12px; text-align: right;">Total Inventory Asset Value:</td>
+                <td style="padding: 12px; text-align: right; color: #0baf65;">K ${totalInventoryCapital.toFixed(2)}</td>
+            </tr>
+        `;
+    } catch (err) {
+        console.error("Error loading stock holdings:", err);
+        tbody.innerHTML = '<tr><td colspan="5" style="padding: 15px; text-align: center; color: red;">Failed to load stock data.</td></tr>';
+    }
+}
 
     const targetTab = document.getElementById(`admin-tab-${tabName}`);
     const targetBtn = document.getElementById(`tab-btn-${tabName}`);
