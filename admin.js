@@ -12,6 +12,10 @@ window.onload = function() {
         loadStockHoldings();
         loadPurchasesHistory();
         
+        // Load Analytics and P&L on initial startup if dashboard tab is active
+        loadBIDashboard();
+        loadPnLReport();
+        
         // Default invoice date to today
         const invDateInput = document.getElementById("purchase-invoice-date");
         if (invDateInput) {
@@ -38,6 +42,13 @@ function switchAdminTab(tabName) {
         targetBtn.style.color = 'white';
     }
 
+    // Trigger data loading based on active tab
+    if (tabName === 'dashboard') {
+        loadBIDashboard();
+    }
+    if (tabName === 'pnl') {
+        loadPnLReport();
+    }
     if (tabName === 'purchases') {
         loadPurchaseProductDropdown();
         loadPurchasesHistory();
@@ -281,7 +292,6 @@ async function recordPurchase(event) {
 
         const newStock = (prod.stock_qty || 0) + qty;
         
-        // Auto-recalculate target margin based on new unit cost and existing price
         const currentPrice = parseFloat(prod.price || 0);
         let newMarginPct = prod.target_margin_pct || 0;
         
@@ -327,8 +337,6 @@ async function loadPurchasesHistory() {
 
         tbody.innerHTML = purchases.map(p => {
             const poCode = p.po_code || '-';
-            
-            // STRICTLY fetch invoice_date from DB only. Do NOT fallback to purchase_date or current date.
             const invDate = p.invoice_date || '-';
             const invRef = p.invoice_ref || '-';
 
@@ -398,6 +406,111 @@ async function loadStockHoldings() {
     } catch (err) {
         console.error("Error loading stock holdings:", err);
         tbody.innerHTML = `<tr><td colspan="5" style="padding: 15px; text-align: center; color: red;">Failed to load stock data.</td></tr>`;
+    }
+}
+
+// --- BI ANALYTICS DASHBOARD ---
+async function loadBIDashboard() {
+    try {
+        const { data: orders, error: orderErr } = await db.from('orders').select('total_amount, order_items_json');
+        if (orderErr) console.error("Orders fetch error:", orderErr.message);
+
+        const { count: customerCount, error: custErr } = await db.from('customers').select('*', { count: 'exact', head: true });
+        if (custErr) console.error("Customers fetch error:", custErr.message);
+        
+        let totalSales = 0;
+        let totalOrderCount = orders ? orders.length : 0;
+        let productTracker = {};
+
+        if (orders) {
+            orders.forEach(o => {
+                totalSales += parseFloat(o.total_amount || 0);
+                
+                const items = o.order_items_json || [];
+                items.forEach(item => {
+                    const prod = item.product || {};
+                    const pid = prod.id || item.product_id || 0;
+                    const qty = item.qty || 1;
+                    const revenue = (parseFloat(prod.deal_price || prod.price || 0)) * qty;
+                    
+                    if (!productTracker[pid]) {
+                        productTracker[pid] = {
+                            name: prod.name || 'Unknown Product',
+                            brand: prod.brand || 'General',
+                            unitsSold: 0,
+                            revenue: 0
+                        };
+                    }
+                    productTracker[pid].unitsSold += qty;
+                    productTracker[pid].revenue += revenue;
+                });
+            });
+        }
+
+        const avgOrderValue = totalOrderCount > 0 ? (totalSales / totalOrderCount) : 0;
+
+        document.getElementById('bi-total-sales').innerText = `K ${totalSales.toFixed(2)}`;
+        document.getElementById('bi-total-orders').innerText = totalOrderCount;
+        document.getElementById('bi-aov').innerText = `K ${avgOrderValue.toFixed(2)}`;
+        document.getElementById('bi-customers').innerText = customerCount || 0;
+
+        const topProducts = Object.values(productTracker).sort((a, b) => b.unitsSold - a.unitsSold).slice(0, 5);
+        const tbody = document.getElementById('bi-top-products');
+        
+        if (topProducts.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" style="padding: 15px; text-align: center; color: #718096;">No sales data available yet.</td></tr>';
+        } else {
+            tbody.innerHTML = topProducts.map(tp => `
+                <tr style="border-bottom: 1px solid #edf2f7;">
+                    <td style="padding: 10px; font-weight: 600; color: #2d3748;">${tp.name}</td>
+                    <td style="padding: 10px; color: #718096;">${tp.brand}</td>
+                    <td style="padding: 10px; text-align: center; font-weight: bold; color: #3182ce;">${tp.unitsSold}</td>
+                    <td style="padding: 10px; text-align: right; color: #0baf65; font-weight: bold;">K ${tp.revenue.toFixed(2)}</td>
+                </tr>
+            `).join('');
+        }
+    } catch (err) {
+        console.error("Error loading BI dashboard:", err);
+    }
+}
+
+// --- PROFIT & LOSS REPORT ---
+async function loadPnLReport() {
+    try {
+        const { data: orders, error } = await db.from('orders').select('total_amount, order_items_json').eq('fulfillment_status', 'Delivered');
+        if (error) throw error;
+
+        let totalRevenue = 0;
+        let totalCOGS = 0;
+
+        if (orders) {
+            orders.forEach(o => {
+                totalRevenue += parseFloat(o.total_amount || 0);
+                
+                const items = o.order_items_json || [];
+                items.forEach(item => {
+                    const prod = item.product || {};
+                    const historicalCost = parseFloat(prod.cost_price || 0);
+                    const qty = item.qty || 1;
+                    totalCOGS += (historicalCost * qty);
+                });
+            });
+        }
+
+        const grossProfit = totalRevenue - totalCOGS;
+        const grossMarginPct = totalRevenue > 0 ? ((grossProfit / totalRevenue) * 100) : 0;
+
+        document.getElementById('pnl-revenue').innerText = `K ${totalRevenue.toFixed(2)}`;
+        document.getElementById('pnl-cogs').innerText = `(K ${totalCOGS.toFixed(2)})`;
+        
+        const profitEl = document.getElementById('pnl-profit');
+        profitEl.innerText = `K ${grossProfit.toFixed(2)}`;
+        profitEl.style.color = grossProfit >= 0 ? '#0baf65' : '#e53e3e';
+
+        document.getElementById('pnl-margin').innerText = `${grossMarginPct.toFixed(2)}%`;
+
+    } catch (err) {
+        console.error("Error loading P&L:", err);
     }
 }
 
