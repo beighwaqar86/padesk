@@ -1,698 +1,1024 @@
 const SUPABASE_URL = "https://cziefuaclocpwicwjprb.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_j_MkiOlGUZOBsR8TSxIM1w_pnQ_B1xx";
+
 let db;
+let allProducts = [];
+let cart = {};
+let currentSlide = 0;
+let slideInterval;
 
 window.onload = function() {
+    db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    loadBanners();
+    loadProducts();
+    autoPopulateSavedCustomer();
+};
+
+// Scroll to cart selection section when header cart graphic is clicked
+function scrollToCartSection() {
+    const cartSection = document.getElementById("cart-section");
+    if (cartSection) {
+        cartSection.scrollIntoView({ behavior: 'smooth' });
+    }
+}
+
+// 1. AUTO-POPULATE & STATE BAR ENGINE
+function autoPopulateSavedCustomer() {
+    const savedPhone = localStorage.getItem("padesk_phone");
+    const savedTitle = localStorage.getItem("padesk_title") || "";
+    const savedFirstName = localStorage.getItem("padesk_first_name") || "";
+    const savedLastName = localStorage.getItem("padesk_last_name") || "";
+    const savedOffice = localStorage.getItem("padesk_office") || "";
+
+    const stateBar = document.getElementById("user-state-bar");
+    const displayName = savedTitle && savedLastName ? `${savedTitle} ${savedLastName}` : (savedFirstName || "Shopper");
+
+    if (savedPhone) {
+        if (stateBar) {
+            stateBar.style.display = "flex";
+            stateBar.innerHTML = `
+                <span>Welcome back, <strong>${displayName}</strong>! 👋</span>
+                <button type="button" onclick="signOut()" class="btn-link-signout">Sign Out</button>
+            `;
+        }
+
+        if (document.getElementById("customer-phone")) document.getElementById("customer-phone").value = savedPhone;
+        if (document.getElementById("customer-title")) document.getElementById("customer-title").value = savedTitle;
+        if (document.getElementById("customer-first-name")) document.getElementById("customer-first-name").value = savedFirstName;
+        if (document.getElementById("customer-last-name")) document.getElementById("customer-last-name").value = savedLastName;
+        if (document.getElementById("workplace-select") && savedOffice) document.getElementById("workplace-select").value = savedOffice;
+
+        loadPastPurchases(savedPhone);
+        loadCustomerCustomCombos(savedPhone);
+    } else {
+        if (stateBar) {
+            stateBar.style.display = "flex";
+            stateBar.innerHTML = `
+                <span>Already ordered?</span>
+                <div class="quick-login-input-wrap">
+                    <input type="tel" id="quick-phone" placeholder="Enter Phone" onkeypress="if(event.key==='Enter') triggerQuickLogin()">
+                    <button type="button" id="btn-quick-login" onclick="triggerQuickLogin()" style="background:#0baf65; color:white; border:none; border-radius:4px; padding:4px 10px; font-weight:bold; cursor:pointer;">Go</button>
+                </div>
+            `;
+        }
+        resetAccountDrawerUI();
+    }
+}
+
+// 2. SIGN-OUT FUNCTION
+function signOut() {
+    localStorage.removeItem("padesk_phone");
+    localStorage.removeItem("padesk_title");
+    localStorage.removeItem("padesk_first_name");
+    localStorage.removeItem("padesk_last_name");
+    localStorage.removeItem("padesk_office");
+    localStorage.removeItem("padesk_name");
+
+    if (document.getElementById("customer-phone")) document.getElementById("customer-phone").value = "";
+    if (document.getElementById("customer-title")) document.getElementById("customer-title").value = "";
+    if (document.getElementById("customer-first-name")) document.getElementById("customer-first-name").value = "";
+    if (document.getElementById("customer-last-name")) document.getElementById("customer-last-name").value = "";
+    if (document.getElementById("workplace-select")) document.getElementById("workplace-select").value = "";
+
+    const pastSection = document.getElementById("past-purchases-section");
+    if (pastSection) pastSection.style.display = "none";
+
+    const customCombosSection = document.getElementById("custom-combos-section");
+    if (customCombosSection) customCombosSection.style.display = "none";
+
+    resetAccountDrawerUI();
+
+    const accountDrawer = document.getElementById("account-drawer");
+    if (accountDrawer && accountDrawer.classList.contains("open")) {
+        toggleAccountDrawer();
+    }
+
+    autoPopulateSavedCustomer();
+}
+
+// 3. QUICK LOGIN TRIGGER
+async function triggerQuickLogin() {
+    const input = document.getElementById("quick-phone");
+    const btn = document.getElementById("btn-quick-login");
+    
+    if (input && input.value) {
+        if (btn) btn.innerText = "⏳";
+        await checkReturningCustomer(input.value, true);
+        if (btn && btn.innerText === "⏳") btn.innerText = "Go";
+    }
+}
+
+// 4. DYNAMIC CUSTOMER LOOKUP
+async function checkReturningCustomer(phone, isQuickLogin = false) {
+    const cleanPhone = phone.trim();
+    if (cleanPhone.length < 9) {
+        if (isQuickLogin) alert("Please enter a valid phone number.");
+        return;
+    }
+
     try {
-        db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        loadAdminProducts();
-        loadAdminBanners();
-        loadAdminOrders();
-        loadPurchaseProductDropdown();
-        loadStockHoldings();
-        loadPurchasesHistory();
-        
-        // NEW: Load Analytics and P&L
-        loadBIDashboard();
-        loadPnLReport();
-        
-        // Default invoice date to today
-        const invDateInput = document.getElementById("purchase-invoice-date");
-        if (invDateInput) {
-            invDateInput.value = new Date().toISOString().split('T')[0];
+        const { data: customer, error } = await db
+            .from('customers')
+            .select('*')
+            .eq('phone_number', cleanPhone)
+            .single();
+
+        if (customer) {
+            if (document.getElementById("customer-title")) document.getElementById("customer-title").value = customer.title || "";
+            if (document.getElementById("customer-first-name")) document.getElementById("customer-first-name").value = customer.first_name || "";
+            if (document.getElementById("customer-last-name")) document.getElementById("customer-last-name").value = customer.last_name || "";
+            if (document.getElementById("workplace-select")) document.getElementById("workplace-select").value = customer.default_office || "";
+            if (document.getElementById("customer-phone")) document.getElementById("customer-phone").value = customer.phone_number;
+
+            localStorage.setItem("padesk_phone", customer.phone_number);
+            localStorage.setItem("padesk_title", customer.title || "");
+            localStorage.setItem("padesk_first_name", customer.first_name || "");
+            localStorage.setItem("padesk_last_name", customer.last_name || "");
+            localStorage.setItem("padesk_office", customer.default_office || "");
+
+            autoPopulateSavedCustomer();
+            
+            if (isQuickLogin) {
+                const displayName = customer.title && customer.last_name ? `${customer.title} ${customer.last_name}` : (customer.first_name || "Shopper");
+                alert(`Welcome back, ${displayName}!`);
+            }
+        } else {
+            if (isQuickLogin) {
+                alert("No account found for this number. Simply build your combo below to get started!");
+            }
         }
     } catch (err) {
-        console.error("Initialization error:", err);
+        console.error("Lookup error:", err);
+        if (isQuickLogin) alert("Error connecting to database. Please try again.");
+    }
+}
+
+// 5. LOAD PAST PURCHASES SLIDER & CUSTOMER COMBOS
+async function loadPastPurchases(phone) {
+    const { data: orders } = await db
+        .from('orders')
+        .select('order_items_json')
+        .eq('customer_phone', phone);
+
+    if (!orders || orders.length === 0) return;
+
+    const pastItemsMap = {};
+    orders.forEach(o => {
+        const items = o.order_items_json || [];
+        items.forEach(item => {
+            const p = item.product;
+            if (p && !pastItemsMap[p.id]) pastItemsMap[p.id] = p;
+        });
+    });
+
+    const uniquePastProducts = Object.values(pastItemsMap);
+    const sliderContainer = document.getElementById("past-purchases-slider");
+    const sectionContainer = document.getElementById("past-purchases-section");
+
+    if (uniquePastProducts.length > 0 && sliderContainer && sectionContainer) {
+        sectionContainer.style.display = "block";
+        sliderContainer.innerHTML = uniquePastProducts.map(p => `
+            <div class="past-card">
+                <div>
+                    <span class="brand-tag">${p.brand || 'General'}</span>
+                    <h5>${p.name}</h5>
+                    <div class="price" style="font-size:0.8rem; margin:2px 0;">K ${parseFloat(p.deal_price || p.price).toFixed(2)}</div>
+                </div>
+                <button onclick='addToCart(${JSON.stringify(p)}, event)' class="btn-add" style="padding:4px 8px; font-size:0.75rem;">+ Add to Combo</button>
+            </div>
+        `).join('');
+    }
+}
+
+async function loadCustomerCustomCombos(phone) {
+    const { data: combos } = await db.from('customer_combos').select('*').eq('customer_phone', phone);
+    
+    const sliderContainer = document.getElementById("custom-combos-slider");
+    const sectionContainer = document.getElementById("custom-combos-section");
+
+    if (!combos || combos.length === 0) {
+        if (sectionContainer) sectionContainer.style.display = "none";
+        return;
+    }
+
+    if (sliderContainer && sectionContainer) {
+        sectionContainer.style.display = "block";
+        sliderContainer.innerHTML = combos.map(c => {
+            const encodedItems = encodeURIComponent(JSON.stringify(c.items_json));
+            return `
+                <div class="past-card" style="min-width: 180px; background: #e6f7f0; border-color: #b2f5ea;">
+                    <div>
+                        <span class="brand-tag" style="color: #088a4f;">Saved Combo</span>
+                        <h5 style="margin: 4px 0; font-size: 0.85rem;">${c.combo_name}</h5>
+                        <small style="color: #718096; font-size: 0.7rem;">${(c.items_json || []).length} items included</small>
+                    </div>
+                    <button type="button" onclick="addBannerComboToCart('${encodedItems}', '${c.combo_name}')" class="btn-add" style="margin-top: 8px; padding: 4px 8px; font-size: 0.75rem; background: #0baf65;">+ Add Combo</button>
+                </div>
+            `;
+        }).join('');
+    }
+}
+
+// 6. ACCOUNT DETAILS DRAWER TOGGLE & BULLETPROOF HISTORY FETCH
+function toggleAccountDrawer() {
+    const drawer = document.getElementById("account-drawer");
+    const overlay = document.getElementById("account-drawer-overlay");
+    if (drawer && overlay) {
+        const isOpen = drawer.classList.contains("open");
+        drawer.classList.toggle("open");
+        overlay.style.display = isOpen ? "none" : "block";
+
+        const savedPhone = localStorage.getItem("padesk_phone");
+        if (!isOpen) {
+            if (savedPhone) {
+                loadAccountHistory(savedPhone);
+            } else {
+                resetAccountDrawerUI();
+            }
+        }
+    }
+}
+
+function resetAccountDrawerUI() {
+    const profileBox = document.getElementById("account-profile-info");
+    const historyList = document.getElementById("account-order-history");
+    const signOutBtn = document.getElementById("drawer-signout-btn");
+
+    if (profileBox) {
+        profileBox.innerHTML = `
+            <p style="margin:0;"><small>You are currently browsing as a <strong>Guest</strong>.</small></p>
+            <small style="color:#718096;">Enter your mobile number at checkout or in the top bar to load your account profile.</small>
+        `;
+    }
+    if (historyList) {
+        historyList.style.cssText = "border:none !important; background:transparent !important; box-shadow:none !important; padding:0 !important;";
+        historyList.innerHTML = "<p style='color:#718096; font-size:0.85rem;'><small>No active session found.</small></p>";
+    }
+    if (signOutBtn) {
+        signOutBtn.style.display = "none";
+    }
+}
+
+// Attach globally to ensure onclick works
+window.toggleCustomerOrderDetails = function(orderId) {
+    const detailBox = document.getElementById(`cust-order-details-${orderId}`);
+    if (detailBox) {
+        detailBox.style.display = detailBox.style.display === 'none' ? 'block' : 'none';
     }
 };
 
-function switchAdminTab(tabName) {
-    document.querySelectorAll('.admin-tab-content').forEach(el => el.style.display = 'none');
-    document.querySelectorAll('[id^="tab-btn-"]').forEach(btn => {
-        btn.style.background = '#edf2f7';
-        btn.style.color = '#4a5568';
-    });
+async function loadAccountHistory(phone) {
+    const profileBox = document.getElementById("account-profile-info");
+    const historyList = document.getElementById("account-order-history");
+    const signOutBtn = document.getElementById("drawer-signout-btn");
 
-    const targetTab = document.getElementById(`admin-tab-${tabName}`);
-    const targetBtn = document.getElementById(`tab-btn-${tabName}`);
+    if (!historyList) return;
 
-    if (targetTab) targetTab.style.display = 'block';
-    if (targetBtn) {
-        targetBtn.style.background = '#0baf65';
-        targetBtn.style.color = 'white';
-    }
+    // Immediately show loading state and strip conflicting global CSS
+    historyList.style.cssText = "border:none !important; background:transparent !important; box-shadow:none !important; padding:0 !important;";
+    historyList.innerHTML = '<div style="padding: 20px; text-align: center; color: #718096; font-family: sans-serif;">⏳ Loading orders...</div>';
 
-    if (tabName === 'purchases') {
-        loadPurchaseProductDropdown();
-        loadPurchasesHistory();
-    }
-    if (tabName === 'stock') {
-        loadStockHoldings();
-    }
-    if (tabName === 'dashboard') {
-        loadBIDashboard();
-    }
-    if (tabName === 'pnl') {
-        loadPnLReport();
-    }
-}
+    const savedTitle = localStorage.getItem("padesk_title") || "";
+    const savedFirstName = localStorage.getItem("padesk_first_name") || "Shopper";
+    const savedLastName = localStorage.getItem("padesk_last_name") || "";
+    const savedOffice = localStorage.getItem("padesk_office") || "Not set";
 
-// --- PRODUCTS CRUD ---
-async function loadAdminProducts() {
-    const tbody = document.getElementById("admin-product-table");
-    if (!tbody) return;
-
-    try {
-        const { data, error } = await db.from('products').select('*').order('id', { ascending: false });
-        if (error) throw error;
-
-        if (!data || data.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" style="padding: 20px; text-align: center;">No products found.</td></tr>';
-            return;
-        }
-
-        tbody.innerHTML = data.map(p => {
-            const encodedProduct = encodeURIComponent(JSON.stringify(p));
-            return `
-                <tr style="border-bottom:1px solid #edf2f7;">
-                    <td style="padding:8px;">${p.product_code || '-'}</td>
-                    <td style="padding:8px;"><strong>${p.name}</strong></td>
-                    <td style="padding:8px;"><span style="background:#e6f7f0; color:#0baf65; padding:2px 6px; border-radius:4px; font-size:0.7rem; font-weight:bold;">${p.business || ''}</span> / ${p.category}</td>
-                    <td style="padding:8px;">K ${parseFloat(p.deal_price || p.price).toFixed(2)}</td>
-                    <td style="padding:8px; text-align:center;">
-                        <button type="button" onclick='editProductFromEncoded("${encodedProduct}")' style="background:#3182ce; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;">Edit</button>
-                        <button type="button" onclick="deleteProduct(${p.id})" style="background:#e53e3e; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;">Del</button>
-                    </td>
-                </tr>
-            `;
-        }).join('');
-    } catch (err) {
-        console.error("Error loading products:", err);
-        tbody.innerHTML = '<tr><td colspan="5" style="padding: 20px; text-align: center; color: red;">Failed to load products.</td></tr>';
-    }
-}
-
-// Helper function to safely decode and edit product without syntax crashes
-function editProductFromEncoded(encodedStr) {
-    try {
-        const p = JSON.parse(decodeURIComponent(encodedStr));
-        editProduct(p);
-    } catch (e) {
-        console.error("Error decoding product:", e);
-    }
-}
-
-// Two-Way Smart Pricing Calculator
-function calculatePricing(source) {
-    const costInput = document.getElementById("p-cost-price");
-    const markupInput = document.getElementById("p-markup");
-    const priceInput = document.getElementById("p-price");
-    const dealPriceInput = document.getElementById("p-deal-price");
-
-    if (!costInput || !markupInput || !priceInput) return;
-
-    let cost = parseFloat(costInput.value) || 0;
-    let markup = parseFloat(markupInput.value) || 0;
-    let price = parseFloat(priceInput.value) || 0;
-
-    if (cost <= 0) return; // Need a cost base to calculate margins
-
-    if (source === 'markup' || source === 'cost') {
-        // Forward Calc: User changes Markup or Cost -> Calculate Selling Prices
-        price = cost + (cost * (markup / 100));
-        priceInput.value = price.toFixed(2);
-        
-        // Auto-populate Deal Price to match, preventing accidental below-cost errors
-        if (dealPriceInput) {
-            dealPriceInput.value = price.toFixed(2);
-        }
-    } else if (source === 'price') {
-        // Reverse Calc: User manually types Regular Selling Price -> Calculate Markup
-        markup = ((price - cost) / cost) * 100;
-        markupInput.value = markup.toFixed(2);
-    }
-}
-
-async function saveProduct(e) {
-    e.preventDefault();
-    const id = document.getElementById("product-id").value;
-    
-    const dealPriceRaw = document.getElementById("p-deal-price").value;
-    const dealPrice = dealPriceRaw ? parseFloat(dealPriceRaw) : null;
-    const regularPrice = parseFloat(document.getElementById("p-price").value);
-    const costPrice = parseFloat(document.getElementById("p-cost-price").value) || 0;
-
-    const payload = {
-        name: document.getElementById("p-name").value.trim(),
-        product_code: document.getElementById("p-code").value.trim() || null,
-        business: document.getElementById("p-business").value,
-        category: document.getElementById("p-category").value.trim(),
-        sub_category: document.getElementById("p-subcategory").value.trim() || null,
-        cost_price: costPrice,
-        target_margin_pct: parseFloat(document.getElementById("p-markup").value) || 0,
-        price: regularPrice,
-        deal_price: dealPrice,
-        brand: document.getElementById("p-brand").value.trim() || null,
-        image_url: document.getElementById("p-image").value.trim() || null,
-        sell_oos: document.getElementById("p-sell-oos").value,
-        is_active: document.getElementById("p-active").checked
-    };
-    
-    // Safety check: Don't sell below cost on EITHER the regular price or the deal price
-    if (regularPrice < costPrice || (dealPrice !== null && dealPrice < costPrice)) {
-        const lowestPrice = (dealPrice !== null && dealPrice < regularPrice) ? dealPrice : regularPrice;
-        if (!confirm(`⚠️ FINANCIAL ALERT: Your selling price (K ${lowestPrice}) is below the Cost Price (K ${costPrice}). Are you sure you want to save?`)) return;
-    }
-
-    const query = id ? db.from('products').update(payload).eq('id', id) : db.from('products').insert([payload]);
-    const { error } = await query;
-    if (error) {
-        alert("Error: " + error.message);
-    } else {
-        alert(id ? "Product updated successfully!" : "Product created! Navigate to 'Stock Purchase' to receive initial inventory.");
-        resetProductForm();
-        loadAdminProducts();
-        loadStockHoldings();
-        loadPurchaseProductDropdown();
-    }
-}
-
-function editProduct(p) {
-    document.getElementById("product-id").value = p.id;
-    document.getElementById("p-name").value = p.name;
-    document.getElementById("p-code").value = p.product_code || '';
-    document.getElementById("p-business").value = p.business || '';
-    document.getElementById("p-category").value = p.category || '';
-    document.getElementById("p-subcategory").value = p.sub_category || '';
-    
-    // Pricing Module Mapping and Locking
-    const costInput = document.getElementById("p-cost-price");
-    if (costInput) {
-        costInput.value = p.cost_price || 0;
-        costInput.readOnly = true; // Lock cost price on edit
-        costInput.style.background = "#edf2f7"; // Visually indicate it's locked
-    }
-    
-    const markupInput = document.getElementById("p-markup");
-    if (markupInput) markupInput.value = p.target_margin_pct || 0;
-
-    document.getElementById("p-price").value = p.price;
-    document.getElementById("p-deal-price").value = p.deal_price || '';
-    
-    document.getElementById("p-brand").value = p.brand || '';
-    document.getElementById("p-image").value = p.image_url || '';
-    document.getElementById("p-sell-oos").value = p.sell_oos || 'N';
-    document.getElementById("p-active").checked = p.is_active;
-    
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-
-async function deleteProduct(id) {
-    if (!confirm("Delete product?")) return;
-    await db.from('products').delete().eq('id', id);
-    loadAdminProducts();
-    loadStockHoldings();
-    loadPurchaseProductDropdown();
-}
-
-function resetProductForm() {
-    document.getElementById("admin-product-form").reset();
-    document.getElementById("product-id").value = "";
-    
-    // Unlock cost price for new product entry
-    const costInput = document.getElementById("p-cost-price");
-    if (costInput) {
-        costInput.readOnly = false;
-        costInput.style.background = "#ffffff";
-    }
-}
-
-// --- PURCHASES MODULE ---
-async function loadPurchaseProductDropdown() {
-    const selectEl = document.getElementById("purchase-product-select");
-    if (!selectEl) return;
-
-    try {
-        const { data: products, error } = await db.from('products').select('id, name, product_code, cost_price').order('name');
-        if (error) throw error;
-
-        selectEl.innerHTML = '<option value="">-- Choose Product --</option>' + (products || []).map(p => `
-            <option value="${p.id}">${p.name} (Code: ${p.product_code || '-'} | Current Cost: K ${parseFloat(p.cost_price || 0).toFixed(2)})</option>
-        `).join('');
-    } catch (err) {
-        console.error("Error loading product dropdown:", err);
-    }
-}
-
-async function recordPurchase(event) {
-    event.preventDefault();
-    
-    const productId = document.getElementById("purchase-product-select").value;
-    const qty = parseInt(document.getElementById("purchase-qty").value);
-    const unitCost = parseFloat(document.getElementById("purchase-unit-cost").value);
-    const supplier = document.getElementById("purchase-supplier").value.trim();
-    const invoiceRef = document.getElementById("purchase-invoice").value.trim();
-    const invoiceDate = document.getElementById("purchase-invoice-date").value;
-
-    if (!productId || !qty || !unitCost || !supplier || !invoiceDate) {
-        return alert("Please fill in all required purchase details including invoice date.");
-    }
-
-    try {
-        const { data: prod, error: fetchErr } = await db.from('products').select('*').eq('id', productId).single();
-        if (fetchErr) throw fetchErr;
-
-        const currentSellingPrice = parseFloat(prod.deal_price || prod.price);
-        
-        if (unitCost > currentSellingPrice) {
-            const confirmOverride = confirm(`⚠️ FINANCIAL ALERT: Purchase unit cost (K ${unitCost.toFixed(2)}) is HIGHER than current selling price (K ${currentSellingPrice.toFixed(2)})! Proceed?`);
-            if (!confirmOverride) return;
-        }
-
-        const dParts = invoiceDate.split('-');
-        const dateStr = `${dParts[2]}${dParts[1]}${dParts[0]}`;
-        
-        const { count } = await db.from('purchases').select('*', { count: 'exact', head: true }).eq('invoice_date', invoiceDate);
-        const seqNum = String((count || 0) + 1).padStart(2, '0');
-        const poCode = `PO${dateStr}${seqNum}`;
-
-        const { error: purchaseErr } = await db.from('purchases').insert([{
-            po_code: poCode,
-            supplier_name: supplier,
-            invoice_ref: invoiceRef,
-            invoice_date: invoiceDate,
-            purchase_date: invoiceDate,
-            product_id: parseInt(productId),
-            qty_received: qty,
-            purchase_unit_cost: unitCost,
-            recorded_by: 'Admin'
-        }]);
-        if (purchaseErr) throw purchaseErr;
-
-        const newStock = (prod.stock_qty || 0) + qty;
-        
-        // Auto-recalculate target margin based on new unit cost and existing price
-        const currentPrice = parseFloat(prod.price || 0);
-        let newMarginPct = prod.target_margin_pct || 0;
-        
-        if (unitCost > 0) {
-            newMarginPct = ((currentPrice - unitCost) / unitCost) * 100;
-        }
-
-        const { error: updateErr } = await db.from('products').update({
-            stock_qty: newStock,
-            cost_price: unitCost,
-            target_margin_pct: newMarginPct
-        }).eq('id', productId);
-
-        if (updateErr) throw updateErr;
-
-        alert(`✅ Stock purchase recorded successfully! PO Code: ${poCode}`);
-        document.getElementById("purchase-form").reset();
-        document.getElementById("purchase-invoice-date").value = new Date().toISOString().split('T')[0];
-        
-        loadAdminProducts();
-        loadStockHoldings();
-        loadPurchasesHistory();
-        loadPurchaseProductDropdown();
-
-    } catch (err) {
-        console.error("Purchase error:", err);
-        alert("Failed to record purchase: " + err.message);
-    }
-}
-
-async function loadPurchasesHistory() {
-    const tbody = document.getElementById("admin-purchases-history-table");
-    if (!tbody) return;
-
-    try {
-        const { data: purchases, error } = await db.from('purchases').select('*, products(name, product_code)').order('id', { ascending: false });
-        if (error) throw error;
-
-        if (!purchases || purchases.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="8" style="padding: 15px; text-align: center; color: #718096;">No purchase orders recorded yet.</td></tr>';
-            return;
-        }
-
-        tbody.innerHTML = purchases.map(p => {
-            const poCode = p.po_code || '-';
-            
-            // STRICTLY fetch invoice_date from DB only. Do NOT fallback to purchase_date or current date.
-            const invDate = p.invoice_date || '-';
-            const invRef = p.invoice_ref || '-';
-
-            const prodName = p.products ? p.products.name : 'Unknown Product';
-            const totalCost = (p.qty_received || 0) * parseFloat(p.purchase_unit_cost || 0);
-
-            return `
-                <tr style="border-bottom: 1px solid #edf2f7;">
-                    <td style="padding: 9px; font-weight: bold; color: #2b6cb0;">${poCode}</td>
-                    <td style="padding: 9px; color: #4a5568; white-space: nowrap;">${invDate}</td>
-                    <td style="padding: 9px; color: #4a5568; font-weight: 500;">${invRef}</td>
-                    <td style="padding: 9px;">${p.supplier_name || '-'}</td>
-                    <td style="padding: 9px; font-weight: 600;">${prodName}</td>
-                    <td style="padding: 9px; text-align: center;">${p.qty_received || 0}</td>
-                    <td style="padding: 9px; text-align: right;">K ${parseFloat(p.purchase_unit_cost || 0).toFixed(2)}</td>
-                    <td style="padding: 9px; text-align: right; font-weight: bold; color: #0baf65;">K ${totalCost.toFixed(2)}</td>
-                </tr>
-            `;
-        }).join('');
-    } catch (err) {
-        console.error("Error loading purchases history:", err);
-        tbody.innerHTML = `<tr><td colspan="8" style="padding: 15px; text-align: center; color: red;">Failed to load purchase history.</td></tr>`;
-    }
-}
-
-// --- STOCK ON HAND ---
-async function loadStockHoldings() {
-    const tbody = document.getElementById("admin-stock-holdings-table");
-    if (!tbody) return;
-
-    try {
-        const { data: products, error } = await db.from('products').select('*').order('name');
-        if (error) throw error;
-
-        if (!products || products.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" style="padding: 15px; text-align: center;">No products found in inventory.</td></tr>';
-            return;
-        }
-
-        let totalInventoryCapital = 0;
-
-        tbody.innerHTML = products.map(p => {
-            const qty = p.stock_qty || 0;
-            const unitCost = parseFloat(p.cost_price || 0);
-            const totalVal = qty * unitCost;
-            totalInventoryCapital += totalVal;
-
-            const stockBadgeStyle = qty <= 0 
-                ? 'background: #fed7d7; color: #c53030; padding: 2px 8px; border-radius: 4px; font-weight: bold;'
-                : 'background: #e6f7f0; color: #0baf65; padding: 2px 8px; border-radius: 4px; font-weight: bold;';
-
-            return `
-                <tr style="border-bottom: 1px solid #edf2f7;">
-                    <td style="padding: 10px; color: #4a5568;">${p.product_code || '-'}</td>
-                    <td style="padding: 10px; font-weight: 600;">${p.name}</td>
-                    <td style="padding: 10px; text-align: center;"><span style="${stockBadgeStyle}">${qty} units</span></td>
-                    <td style="padding: 10px; text-align: right;">K ${unitCost.toFixed(2)}</td>
-                    <td style="padding: 10px; text-align: right; font-weight: bold;">K ${totalVal.toFixed(2)}</td>
-                </tr>
-            `;
-        }).join('') + `
-            <tr style="background: #f8fafc; font-weight: bold; border-top: 2px solid #cbd5e0;">
-                <td colspan="4" style="padding: 12px; text-align: right;">Total Inventory Asset Value:</td>
-                <td style="padding: 12px; text-align: right; color: #0baf65;">K ${totalInventoryCapital.toFixed(2)}</td>
-            </tr>
+    if (profileBox) {
+        profileBox.innerHTML = `
+            <strong>${savedTitle} ${savedFirstName} ${savedLastName}</strong><br>
+            <small>📱 Phone: ${phone}</small><br>
+            <small>🏢 Office: ${savedOffice}</small>
         `;
-    } catch (err) {
-        console.error("Error loading stock holdings:", err);
-        tbody.innerHTML = `<tr><td colspan="5" style="padding: 15px; text-align: center; color: red;">Failed to load stock data.</td></tr>`;
     }
-}
 
-// --- BI ANALYTICS DASHBOARD ---
-// --- BI ANALYTICS DASHBOARD ---
-async function loadBIDashboard() {
+    if (signOutBtn) signOutBtn.style.display = "block";
+
     try {
-        const { data: orders, error: orderErr } = await db.from('orders').select('total_amount, order_items_json');
-        if (orderErr) console.error("Orders fetch error:", orderErr.message);
+        const { data: orders, error } = await db
+            .from('orders')
+            .select('*')
+            .eq('customer_phone', phone)
+            .order('id', { ascending: false });
 
-        const { count: customerCount, error: custErr } = await db.from('customers').select('*', { count: 'exact', head: true });
-        if (custErr) console.error("Customers fetch error:", custErr.message);
-        
-        let totalSales = 0;
-        let totalOrderCount = orders ? orders.length : 0;
-        let productTracker = {};
+        if (error) throw error;
 
-        if (orders) {
-            orders.forEach(o => {
-                totalSales += parseFloat(o.total_amount || 0);
-                
-                const items = o.order_items_json || [];
-                items.forEach(item => {
-                    const prod = item.product || {};
-                    const pid = prod.id || item.product_id || 0;
-                    const qty = item.qty || 1;
-                    const revenue = (parseFloat(prod.deal_price || prod.price || 0)) * qty;
-                    
-                    if (!productTracker[pid]) {
-                        productTracker[pid] = {
-                            name: prod.name || 'Unknown Product',
-                            brand: prod.brand || 'General',
-                            unitsSold: 0,
-                            revenue: 0
-                        };
-                    }
-                    productTracker[pid].unitsSold += qty;
-                    productTracker[pid].revenue += revenue;
-                });
-            });
+        if (!orders || orders.length === 0) {
+            historyList.innerHTML = '<div style="padding: 20px; text-align: center; color: #718096;">No past orders found.</div>';
+            return;
         }
 
-        const avgOrderValue = totalOrderCount > 0 ? (totalSales / totalOrderCount) : 0;
+        historyList.innerHTML = orders.map(o => {
+            const orderDate = o.created_at ? new Date(o.created_at).toLocaleDateString() : '-';
+            const orderNum = o.order_number || (`#ORD-${o.id}`);
+            const status = o.fulfillment_status || 'Order Placed';
+            const items = o.order_items_json || [];
+            const total = parseFloat(o.total_amount || 0).toFixed(2);
+            
+            const color = status === 'Delivered' ? '#0baf65' : (status === 'Cancelled' ? '#e53e3e' : '#3182ce');
 
-        document.getElementById('bi-total-sales').innerText = `K ${totalSales.toFixed(2)}`;
-        document.getElementById('bi-total-orders').innerText = totalOrderCount;
-        document.getElementById('bi-aov').innerText = `K ${avgOrderValue.toFixed(2)}`;
-        document.getElementById('bi-customers').innerText = customerCount || 0;
+            // Generate items carefully without tables
+            let itemsHtml = items.map(item => {
+                const pName = (item.product && item.product.name) ? item.product.name : 'Item';
+                const pPrice = item.product ? parseFloat(item.product.deal_price || item.product.price || 0) : 0;
+                return `
+                    <div style="display: flex; justify-content: space-between; font-size: 0.75rem; border-bottom: 1px solid #edf2f7; padding: 6px 0; color: #2d3748;">
+                        <span>${item.qty || 1}x ${pName}</span>
+                        <strong style="color: #0baf65;">K ${(pPrice * (item.qty || 1)).toFixed(2)}</strong>
+                    </div>
+                `;
+            }).join('');
 
-        const topProducts = Object.values(productTracker).sort((a, b) => b.unitsSold - a.unitsSold).slice(0, 5);
-        const tbody = document.getElementById('bi-top-products');
-        
-        if (topProducts.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4" style="padding: 15px; text-align: center; color: #718096;">No sales data available yet.</td></tr>';
-        } else {
-            tbody.innerHTML = topProducts.map(tp => `
-                <tr style="border-bottom: 1px solid #edf2f7;">
-                    <td style="padding: 10px; font-weight: 600; color: #2d3748;">${tp.name}</td>
-                    <td style="padding: 10px; color: #718096;">${tp.brand}</td>
-                    <td style="padding: 10px; text-align: center; font-weight: bold; color: #3182ce;">${tp.unitsSold}</td>
-                    <td style="padding: 10px; text-align: right; color: #0baf65; font-weight: bold;">K ${tp.revenue.toFixed(2)}</td>
-                </tr>
+            return `
+                <div style="background: white; border: 1px solid #cbd5e0; border-radius: 8px; padding: 12px; margin-bottom: 10px; font-family: sans-serif; display: block; width: 100%; box-sizing: border-box; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                    <div onclick="window.toggleCustomerOrderDetails(${o.id})" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;">
+                        <div>
+                            <div style="font-weight: bold; color: #2d3748; font-size: 0.9rem;">${orderNum}</div>
+                            <div style="font-size: 0.75rem; color: #718096;">${orderDate} • <span style="color:${color}; font-weight:bold;">${status}</span></div>
+                        </div>
+                        <div style="text-align: right;">
+                            <div style="font-weight: bold; color: #0baf65; font-size: 0.9rem;">K ${total}</div>
+                            <div style="font-size: 0.7rem; color: #a0aec0;">Tap view ▾</div>
+                        </div>
+                    </div>
+
+                    <div id="cust-order-details-${o.id}" style="display: none; margin-top: 10px; padding-top: 10px; border-top: 1px solid #e2e8f0;">
+                        <div style="font-size: 0.75rem; color: #4a5568; margin-bottom: 8px; line-height: 1.4;">
+                            📍 <strong>Delivery:</strong> ${o.delivery_location || '-'}<br>
+                            💳 <strong>Payment:</strong> ${o.payment_method || 'CoD'}
+                        </div>
+                        <div style="font-weight: bold; font-size: 0.75rem; color: #4a5568; margin-bottom: 4px;">📦 Ordered Items:</div>
+                        ${itemsHtml}
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+    } catch (err) {
+        historyList.innerHTML = `<div style="color: #e53e3e; padding: 10px; font-size: 0.8rem; background: #fff5f5; border: 1px solid #feb2b2; border-radius: 6px;"><strong>Error loading orders:</strong> ${err.message}</div>`;
+    }
+}
+function openFullOrderHistory() {
+    const phone = localStorage.getItem("padesk_phone");
+    if (!phone) {
+        alert("Please sign in or enter your phone number first.");
+        return;
+    }
+    window.location.href = "my-orders.html";
+}
+// 7. READY-MADE ADMIN COMBO BANNERS SLIDER
+async function loadBanners() {
+    const { data: banners } = await db.from('banners').select('*').eq('is_active', true);
+    if (!banners || banners.length === 0) return;
+
+    const container = document.getElementById("banner-carousel");
+    const dotsContainer = document.getElementById("slider-dots");
+
+    if (container) {
+        container.innerHTML = banners.map(b => {
+            const encodedItems = b.items_json ? encodeURIComponent(JSON.stringify(b.items_json)) : '';
+            const comboTitle = b.title || 'Combo';
+
+            return `
+                <div class="banner-card" style="background-image: url('${b.image_url}'); position: relative;">
+                    ${b.items_json ? `
+                        <button type="button" onclick="addBannerComboToCart('${encodedItems}', '${comboTitle}')" class="btn-add-combo" style="position: absolute; top: 10px; right: 10px; background: #0baf65; color: white; border: none; padding: 6px 12px; border-radius: 8px; font-weight: 800; font-size: 0.75rem; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.3); z-index: 5;">
+                            + Add Combo
+                        </button>
+                    ` : ''}
+                    <div class="banner-overlay" style="display: flex; flex-direction: column; justify-content: flex-end; align-items: flex-start;">
+                        <span style="background: #0baf65; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.6rem; font-weight: bold; text-transform: uppercase; margin-bottom: 4px;">Ready Combo</span>
+                        <h4 style="margin: 0 0 2px; font-size: 0.95rem;">${b.title || ''}</h4>
+                        <p style="margin: 0; font-size: 0.75rem; opacity: 0.95;">${b.subtitle || ''}</p>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        if (dotsContainer) {
+            dotsContainer.innerHTML = banners.map((_, idx) => `
+                <span class="dot ${idx === 0 ? 'active' : ''}" id="dot-${idx}"></span>
             `).join('');
         }
-    } catch (err) {
-        console.error("Error loading BI dashboard:", err);
+
+        startAutoSlide(banners.length);
+        container.addEventListener('scroll', () => syncDotsOnScroll(banners.length));
     }
 }
 
-// --- PROFIT & LOSS REPORT ---
-async function loadPnLReport() {
+function addBannerComboToCart(encodedItems, comboTitle) {
     try {
-        const { data: orders, error } = await db.from('orders').select('total_amount, order_items_json').eq('fulfillment_status', 'Delivered');
-        if (error) throw error;
+        const decodedString = decodeURIComponent(encodedItems);
+        const comboItems = JSON.parse(decodedString);
 
-        let totalRevenue = 0;
-        let totalCOGS = 0;
-
-        if (orders) {
-            orders.forEach(o => {
-                totalRevenue += parseFloat(o.total_amount || 0);
-                
-                const items = o.order_items_json || [];
-                items.forEach(item => {
-                    const prod = item.product || {};
-                    const historicalCost = parseFloat(prod.cost_price || 0);
-                    const qty = item.qty || 1;
-                    totalCOGS += (historicalCost * qty);
-                });
-            });
+        if (!Array.isArray(comboItems) || comboItems.length === 0) {
+            return alert("No items found in this combo.");
         }
 
-        const grossProfit = totalRevenue - totalCOGS;
-        const grossMarginPct = totalRevenue > 0 ? ((grossProfit / totalRevenue) * 100) : 0;
+        comboItems.forEach(ci => {
+            const product = ci.product;
+            const qty = ci.qty || 1;
 
-        document.getElementById('pnl-revenue').innerText = `K ${totalRevenue.toFixed(2)}`;
-        document.getElementById('pnl-cogs').innerText = `(K ${totalCOGS.toFixed(2)})`;
-        
-        const profitEl = document.getElementById('pnl-profit');
-        profitEl.innerText = `K ${grossProfit.toFixed(2)}`;
-        profitEl.style.color = grossProfit >= 0 ? '#0baf65' : '#e53e3e';
+            if (product && product.id) {
+                const stockQty = product.stock_qty || 0;
+                const sellOos = product.sell_oos || 'N';
 
-        document.getElementById('pnl-margin').innerText = `${grossMarginPct.toFixed(2)}%`;
+                if (stockQty <= 0 && sellOos !== 'Y') {
+                    console.warn(`Skipping out-of-stock product "${product.name}" in combo.`);
+                    return;
+                }
 
-    } catch (err) {
-        console.error("Error loading P&L:", err);
+                if (cart[product.id]) {
+                    cart[product.id].qty += qty;
+                } else {
+                    cart[product.id] = { product: product, qty: qty };
+                }
+            }
+        });
+
+        updateCartUI();
+        alert(`⚡ "${comboTitle}" added to your cart successfully! Check your minimum combo criteria below.`);
+    } catch (e) {
+        console.error("Error adding combo:", e);
+        alert("Could not process this combo items list.");
     }
 }
 
-// --- PROFIT & LOSS REPORT ---
-async function loadPnLReport() {
-    try {
-        const { data: orders, error } = await db.from('orders').select('total_amount, order_items_json').eq('fulfillment_status', 'Delivered');
-        if (error) throw error;
+function startAutoSlide(totalSlides) {
+    clearInterval(slideInterval);
+    slideInterval = setInterval(() => {
+        const container = document.getElementById("banner-carousel");
+        if (!container) return;
 
-        let totalRevenue = 0;
-        let totalCOGS = 0;
+        currentSlide = (currentSlide + 1) % totalSlides;
+        const slideWidth = container.clientWidth; // Takes exact 100% container width
+        container.scrollTo({ left: slideWidth * currentSlide, behavior: 'smooth' });
+    }, 4000);
+}
 
-        if (orders) {
-            orders.forEach(o => {
-                totalRevenue += parseFloat(o.total_amount || 0);
-                
-                const items = o.order_items_json || [];
-                items.forEach(item => {
-                    const historicalCost = parseFloat(item.product.cost_price || 0);
-                    const qty = item.qty || 1;
-                    totalCOGS += (historicalCost * qty);
-                });
-            });
-        }
+function syncDotsOnScroll(totalSlides) {
+    const container = document.getElementById("banner-carousel");
+    if (!container) return;
 
-        const grossProfit = totalRevenue - totalCOGS;
-        const grossMarginPct = totalRevenue > 0 ? ((grossProfit / totalRevenue) * 100) : 0;
+    const slideWidth = container.clientWidth;
+    const activeIdx = Math.round(container.scrollLeft / slideWidth);
 
-        document.getElementById('pnl-revenue').innerText = `K ${totalRevenue.toFixed(2)}`;
-        document.getElementById('pnl-cogs').innerText = `(K ${totalCOGS.toFixed(2)})`;
-        
-        const profitEl = document.getElementById('pnl-profit');
-        profitEl.innerText = `K ${grossProfit.toFixed(2)}`;
-        profitEl.style.color = grossProfit >= 0 ? '#0baf65' : '#e53e3e';
-
-        document.getElementById('pnl-margin').innerText = `${grossMarginPct.toFixed(2)}%`;
-
-    } catch (err) {
-        console.error("Error loading P&L:", err);
+    for (let i = 0; i < totalSlides; i++) {
+        const dot = document.getElementById(`dot-${i}`);
+        if (dot) dot.classList.toggle('active', i === activeIdx);
     }
 }
 
-// --- BANNERS ---
-async function loadAdminBanners() {
-    const { data } = await db.from('banners').select('*').order('id', { ascending: false });
-    const container = document.getElementById("admin-banners-list");
-    if (!data || !container) return;
-    container.innerHTML = data.map(b => `
-        <div style="border:1px solid #e2e8f0; padding:10px; border-radius:8px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
-            <div>
-                <strong>${b.title}</strong><br><small>${b.subtitle || ''}</small>
-            </div>
-            <button type="button" onclick="deleteBanner(${b.id})" style="background:#e53e3e; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;">Delete</button>
-        </div>
-    `).join('');
+// 8. FETCH PRODUCTS FROM DATABASE MASTER
+async function loadProducts() {
+    const { data: products, error } = await db.from('products').select('*').eq('is_active', true);
+    if (error || !products) {
+        document.getElementById("product-list").innerText = "Failed to load products.";
+        return;
+    }
+
+    allProducts = products;
+    buildDynamicMasterFilters();
+    renderProducts(allProducts);
 }
 
-async function deleteBanner(id) {
-    await db.from('banners').delete().eq('id', id);
-    loadAdminBanners();
-}
+// 9. HIERARCHICAL DRILL-DOWN FILTERS (LOCAL WORKSPACE IMAGES FOR BUSINESS & CATEGORY)
+function buildDynamicMasterFilters() {
+    const rawBusinesses = [...new Set(allProducts.map(p => p.business).filter(Boolean))];
+    const businesses = ['ALL', ...rawBusinesses.filter(b => b.toLowerCase() !== 'groceries' || b === 'Grocery')];
 
-// --- FULFILLMENT ORDERS ---
-async function loadAdminOrders() {
-    const { data: orders } = await db.from('orders').select('*').order('id', { ascending: false });
-    const { data: customers } = await db.from('customers').select('*');
+    const businessCircles = document.getElementById("business-circles");
     
-    const customerMap = {};
-    if (customers) {
-        customers.forEach(c => { customerMap[c.phone_number] = c; });
+    const businessImages = {
+        'Grocery': 'images/business/grocery.png',
+        'grocery': 'images/business/grocery.png',
+        'Health & Beauty': 'images/business/beauty.png',
+        'Stationery': 'images/business/stationery.png',
+        'Electronics': 'images/business/electronics.png'
+    };
+
+    if (businessCircles) {
+        businessCircles.innerHTML = businesses.map((bus, idx) => {
+            const isAll = bus === 'ALL';
+            const bgImg = businessImages[bus] || businessImages[bus.toLowerCase()];
+
+            if (isAll || !bgImg) {
+                return `
+                    <div class="circle-item ${idx === 0 ? 'active' : ''}" onclick="selectBusinessCircle('${bus}', this)">
+                        <div class="circle-icon" style="background: linear-gradient(135deg, #f7fafc, #edf2f7); border: 2px solid ${idx === 0 ? '#0baf65' : '#e2e8f0'}; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.03);">📦</div>
+                        <span>${bus}</span>
+                    </div>
+                `;
+            } else {
+                return `
+                    <div class="circle-item ${idx === 0 ? 'active' : ''}" onclick="selectBusinessCircle('${bus}', this)">
+                        <div class="circle-icon" style="background-image: url('${bgImg}'); background-size: cover; background-position: center; border: 2px solid ${idx === 0 ? '#0baf65' : '#e2e8f0'};"></div>
+                        <span>${bus}</span>
+                    </div>
+                `;
+            }
+        }).join('');
     }
 
-    const tbody = document.getElementById("admin-orders-table");
-    if (!orders || !tbody) return;
+    applyFilters();
+}
 
-    tbody.innerHTML = orders.map(o => {
-        const orderDate = o.created_at ? new Date(o.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-';
-        const orderNum = o.order_number || (`#ORD-${o.id}`);
-        
-        const cust = customerMap[o.customer_phone] || {};
-        const customerName = `${cust.title || ''} ${cust.first_name || ''} ${cust.last_name || ''}`.trim() || 'Valued Shopper';
-        const items = o.order_items_json || [];
+function selectBusinessCircle(businessName, element) {
+    document.querySelectorAll('#business-circles .circle-item').forEach(el => {
+        el.classList.remove('active');
+        const iconDiv = el.querySelector('.circle-icon');
+        if (iconDiv) iconDiv.style.borderColor = '#e2e8f0';
+    });
+    
+    if (element) {
+        element.classList.add('active');
+        const activeIcon = element.querySelector('.circle-icon');
+        if (activeIcon) activeIcon.style.borderColor = '#0baf65';
+    }
+
+    const catCirclesContainer = document.getElementById("category-circles");
+    const subCirclesContainer = document.getElementById("subcategory-circles");
+    
+    subCirclesContainer.style.display = 'none';
+
+    if (businessName === 'ALL') {
+        catCirclesContainer.style.display = 'none';
+    } else {
+        const busProducts = allProducts.filter(p => p.business === businessName);
+        const categories = ['ALL', ...new Set(busProducts.map(p => p.category).filter(Boolean))];
+
+        const categoryImages = {
+            'Food': 'images/category/food.png',
+            'Home Care': 'images/category/home-care.png',
+            'School': 'images/category/school.png'
+        };
+
+        if (categories.length > 1) {
+            catCirclesContainer.style.display = 'flex';
+            catCirclesContainer.innerHTML = categories.map((cat, idx) => {
+                const isAll = cat === 'ALL';
+                const catKey = cat;
+                const catImg = categoryImages[catKey];
+
+                if (isAll || !catImg) {
+                    return `
+                        <div class="circle-item ${idx === 0 ? 'active' : ''}" onclick="selectCategoryCircle('${businessName}', '${cat}', this)">
+                            <div class="circle-icon" style="width:48px; height:48px; background: linear-gradient(135deg, #f7fafc, #edf2f7); border: 2px solid ${idx === 0 ? '#0baf65' : '#cbd5e0'}; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.03);">📦</div>
+                            <span style="font-size:0.68rem;">${cat}</span>
+                        </div>
+                    `;
+                } else {
+                    return `
+                        <div class="circle-item ${idx === 0 ? 'active' : ''}" onclick="selectCategoryCircle('${businessName}', '${cat}', this)">
+                            <div class="circle-icon" style="width:48px; height:48px; background-image: url('${catImg}'); background-size: cover; background-position: center; border: 2px solid ${idx === 0 ? '#0baf65' : '#cbd5e0'}; box-shadow: 0 2px 4px rgba(0,0,0,0.03);"></div>
+                            <span style="font-size:0.68rem;">${cat}</span>
+                        </div>
+                    `;
+                }
+            }).join('');
+        } else {
+            catCirclesContainer.style.display = 'none';
+        }
+    }
+
+    applyFilters();
+}
+
+function selectCategoryCircle(businessName, categoryName, element) {
+    document.querySelectorAll('#category-circles .circle-item').forEach(el => {
+        el.classList.remove('active');
+        const iconDiv = el.querySelector('.circle-icon');
+        if (iconDiv) iconDiv.style.borderColor = '#cbd5e0';
+    });
+
+    if (element) {
+        element.classList.add('active');
+        const activeIcon = element.querySelector('.circle-icon');
+        if (activeIcon) activeIcon.style.borderColor = '#0baf65';
+    }
+
+    const subCirclesContainer = document.getElementById("subcategory-circles");
+
+    if (categoryName === 'ALL') {
+        subCirclesContainer.style.display = 'none';
+    } else {
+        const catProducts = allProducts.filter(p => p.business === businessName && p.category === categoryName);
+        const subcategories = ['ALL', ...new Set(catProducts.map(p => p.sub_category).filter(Boolean))];
+
+        if (subcategories.length > 1) {
+            subCirclesContainer.style.display = 'flex';
+            subCirclesContainer.innerHTML = subcategories.map((sub, idx) => `
+                <div class="circle-item ${idx === 0 ? 'active' : ''}" onclick="selectSubcategoryCircle('${sub}', this)">
+                    <div class="circle-icon" style="width:42px; height:42px; background: #edf2f7; border: 2px solid ${idx === 0 ? '#0baf65' : '#cbd5e0'}; display: flex; align-items: center; justify-content: center; font-size: 0.9rem;">📌</div>
+                    <span style="font-size:0.65rem;">${sub}</span>
+                </div>
+            `).join('');
+        } else {
+            subCirclesContainer.style.display = 'none';
+        }
+    }
+
+    applyFilters();
+}
+
+function selectSubcategoryCircle(subName, element) {
+    document.querySelectorAll('#subcategory-circles .circle-item').forEach(el => {
+        el.classList.remove('active');
+        const iconDiv = el.querySelector('.circle-icon');
+        if (iconDiv) iconDiv.style.borderColor = '#cbd5e0';
+    });
+
+    if (element) {
+        element.classList.add('active');
+        const activeIcon = element.querySelector('.circle-icon');
+        if (activeIcon) activeIcon.style.borderColor = '#0baf65';
+    }
+
+    applyFilters();
+}
+
+// 10. UNIVERSAL SEARCH & HIERARCHICAL FILTER ENGINE
+function applyFilters() {
+    const activeBusinessEl = document.querySelector('#business-circles .circle-item.active span');
+    const activeCategoryEl = document.querySelector('#category-circles .circle-item.active span');
+    const activeSubcategoryEl = document.querySelector('#subcategory-circles .circle-item.active span');
+
+    const selectedBusiness = activeBusinessEl ? activeBusinessEl.innerText : 'ALL';
+    const selectedCategory = activeCategoryEl ? activeCategoryEl.innerText : 'ALL';
+    const selectedSubcategory = activeSubcategoryEl ? activeSubcategoryEl.innerText : 'ALL';
+
+    const searchQuery = (document.getElementById("search-input")?.value || "").toLowerCase().trim();
+
+    let filtered = allProducts;
+
+    if (selectedBusiness !== 'ALL') {
+        filtered = filtered.filter(p => p.business === selectedBusiness);
+    }
+    
+    const catContainer = document.getElementById("category-circles");
+    if (catContainer && catContainer.style.display !== 'none' && selectedCategory !== 'ALL') {
+        filtered = filtered.filter(p => p.category === selectedCategory);
+    }
+
+    const subContainer = document.getElementById("subcategory-circles");
+    if (subContainer && subContainer.style.display !== 'none' && selectedSubcategory !== 'ALL') {
+        filtered = filtered.filter(p => p.sub_category === selectedSubcategory);
+    }
+
+    if (searchQuery !== "") {
+        filtered = filtered.filter(p => 
+            (p.name && p.name.toLowerCase().includes(searchQuery)) ||
+            (p.product_code && p.product_code.toLowerCase().includes(searchQuery)) ||
+            (p.category && p.category.toLowerCase().includes(searchQuery)) ||
+            (p.sub_category && p.sub_category.toLowerCase().includes(searchQuery)) ||
+            (p.brand && p.brand.toLowerCase().includes(searchQuery)) ||
+            (p.business && p.business.toLowerCase().includes(searchQuery))
+        );
+    }
+
+    renderProducts(filtered);
+}
+
+function renderProducts(products) {
+    const container = document.getElementById("product-list");
+    if (products.length === 0) {
+        container.innerHTML = "<p><small>No items match your search or filter.</small></p>";
+        return;
+    }
+
+    container.innerHTML = products.map(p => {
+        const activePrice = p.deal_price ? p.deal_price : p.price;
+        const stockQty = p.stock_qty || 0;
+        const sellOos = p.sell_oos || 'N';
+        const isOutOfStock = stockQty <= 0 && sellOos !== 'Y';
 
         return `
-            <tr style="border-bottom:1px solid #edf2f7; background: #fff;">
-                <td style="padding:10px; font-weight: bold; color: #2d3748;">#${o.id}</td>
-                <td style="padding:10px; color: #4a5568; white-space: nowrap;">${orderDate}</td>
-                <td style="padding:10px;">
-                    <button type="button" onclick="toggleOrderDetails(${o.id})" style="background: #ebf8ff; color: #2b6cb0; border: 1px solid #bee3f8; padding: 4px 8px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 0.8rem;">
-                        📋 ${orderNum} ▾
-                    </button>
-                </td>
-                <td style="padding:10px;">
-                    <strong>${customerName}</strong><br>
-                    <small style="color: #718096;">📱 ${o.customer_phone || '-'}</small><br>
-                    <small style="color: #e53e3e;">📍 ${o.delivery_location || '-'}</small>
-                </td>
-                <td style="padding:10px;">
-                    <strong style="color: #0baf65;">K ${parseFloat(o.total_amount).toFixed(2)}</strong><br>
-                    <small style="color: #4a5568;">${o.payment_method || 'Mobile Money'} (${o.payment_status || 'Pending'})</small>
-                </td>
-                <td style="padding:10px;">
-                    <div style="display: flex; align-items: center; gap: 6px;">
-                        <select id="status-${o.id}" style="padding: 4px; font-size: 0.75rem;">
-                            <option value="Order Placed" ${o.fulfillment_status === 'Order Placed' ? 'selected' : ''}>Order Placed</option>
-                            <option value="Aggregating" ${o.fulfillment_status === 'Aggregating' ? 'selected' : ''}>Aggregating</option>
-                            <option value="Dispatched" ${o.fulfillment_status === 'Dispatched' ? 'selected' : ''}>Dispatched</option>
-                            <option value="Delivered" ${o.fulfillment_status === 'Delivered' ? 'selected' : ''}>Delivered</option>
-                            <option value="Cancelled" ${o.fulfillment_status === 'Cancelled' ? 'selected' : ''}>Cancelled</option>
-                        </select>
-                        <button type="button" onclick="updateFulfillmentStatus(${o.id})" style="background: #0baf65; color: white; border: none; padding: 5px 10px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 0.75rem;">
-                            Save
-                        </button>
+            <div class="product-card" style="${isOutOfStock ? 'opacity: 0.65; background: #f7fafc;' : ''}">
+                <div>
+                    <img src="${p.image_url || 'https://via.placeholder.com/150'}" alt="${p.name}">
+                    <span class="brand-tag">${p.brand || 'General'}</span>
+                    <h4>${p.name}</h4>
+                    <small style="color:#718096">Code: ${p.product_code || '-'}</small>
+                </div>
+                <div>
+                    <div class="price">
+                        K ${parseFloat(activePrice).toFixed(2)}
+                        ${p.deal_price ? `<small style="text-decoration:line-through; color:#a0aec0; font-size:0.75rem;">K${parseFloat(p.price).toFixed(2)}</small>` : ''}
                     </div>
-                </td>
-            </tr>
-            <tr id="details-row-${o.id}" style="display: none; background: #f8fafc; border-bottom: 2px solid #e2e8f0;">
-                <td colspan="6" style="padding: 14px; text-align: center;">
-                    <div style="background: white; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; max-width: 650px; margin: 0 auto; text-align: left;">
-                        <h4 style="margin: 0 0 8px 0; font-size: 0.82rem; color: #2d3748;">📦 Order Breakdown (${items.length} items)</h4>
-                        <table style="width: 100%; font-size: 0.78rem; border-collapse: collapse;">
-                            <thead>
-                                <tr style="border-bottom: 1px solid #edf2f7; text-align: left; color: #718096;">
-                                    <th style="padding: 4px;">Product Name</th>
-                                    <th style="padding: 4px;">Code</th>
-                                    <th style="padding: 4px; text-align: center;">Qty</th>
-                                    <th style="padding: 4px; text-align: right;">Unit Price</th>
-                                    <th style="padding: 4px; text-align: right;">Total Value</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${items.map(item => {
-                                    const p = item.product || {};
-                                    const price = parseFloat(p.deal_price || p.price || 0);
-                                    const totalVal = price * (item.qty || 1);
-                                    return `
-                                        <tr style="border-bottom: 1px solid #f7fafc;">
-                                            <td style="padding: 5px 4px; font-weight: 600;">${p.name || 'Item'}</td>
-                                            <td style="padding: 5px 4px; color: #718096;">${p.product_code || '-'}</td>
-                                            <td style="padding: 5px 4px; text-align: center;">${item.qty || 1}</td>
-                                            <td style="padding: 5px 4px; text-align: right;">K ${price.toFixed(2)}</td>
-                                            <td style="padding: 5px 4px; text-align: right; font-weight: bold; color: #0baf65;">K ${totalVal.toFixed(2)}</td>
-                                        </tr>
-                                    `;
-                                }).join('')}
-                            </tbody>
-                        </table>
-                    </div>
-                </td>
-            </tr>
+                    ${isOutOfStock 
+                        ? `<button class="btn-add" disabled style="background: #cbd5e0; color: #718096; cursor: not-allowed;">Out of Stock</button>`
+                        : `<button onclick='addToCart(${JSON.stringify(p)}, event)' class="btn-add">+ Add</button>`
+                    }
+                </div>
+            </div>
         `;
     }).join('');
 }
 
-function toggleOrderDetails(orderId) {
-    const row = document.getElementById(`details-row-${orderId}`);
-    if (row) {
-        row.style.display = row.style.display === 'none' ? 'table-row' : 'none';
+// 11. QUANTITY BASKET & COMBO ENGINE
+function addToCart(product, event) {
+    const stockQty = product.stock_qty || 0;
+    const sellOos = product.sell_oos || 'N';
+
+    if (stockQty <= 0 && sellOos !== 'Y') {
+        alert(`Sorry, "${product.name}" is currently out of stock.`);
+        return;
+    }
+
+    if (cart[product.id]) {
+        cart[product.id].qty += 1;
+    } else {
+        cart[product.id] = { product: product, qty: 1 };
+    }
+    updateCartUI();
+
+    if (event && event.target) {
+        const btn = event.target;
+        const originalText = btn.innerText;
+        
+        btn.innerText = "Added ✓";
+        btn.classList.add("success");
+        btn.disabled = true;
+
+        setTimeout(() => {
+            btn.innerText = originalText;
+            btn.classList.remove("success");
+            btn.disabled = false;
+        }, 800);
+    }
+
+    const cartCard = document.getElementById("cart-section");
+    if (cartCard) {
+        cartCard.classList.add("pulse");
+        setTimeout(() => cartCard.classList.remove("pulse"), 300);
     }
 }
 
-async function updateFulfillmentStatus(orderId) {
-    const selectEl = document.getElementById(`status-${orderId}`);
-    if (!selectEl) return;
+function updateQuantity(productId, change) {
+    if (cart[productId]) {
+        cart[productId].qty += change;
+        if (cart[productId].qty <= 0) delete cart[productId];
+    }
+    updateCartUI();
+}
 
-    const newStatus = selectEl.value;
+function updateCartUI() {
+    const list = document.getElementById("cart-items");
+    const items = Object.values(cart);
+
+    list.innerHTML = items.map(item => {
+        const effectivePrice = item.product.deal_price ? item.product.deal_price : item.product.price;
+        return `
+            <li style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 0.85rem;">
+                <div>
+                    <strong>${item.product.name}</strong><br>
+                    <small>K ${parseFloat(effectivePrice).toFixed(2)} x ${item.qty} = <strong>K ${(parseFloat(effectivePrice) * item.qty).toFixed(2)}</strong></small>
+                </div>
+                <div style="display: flex; align-items: center; gap: 6px;">
+                    <button onclick="updateQuantity(${item.product.id}, -1)" style="background: #edf2f7; border: 1px solid #cbd5e0; border-radius: 4px; padding: 2px 8px; font-weight: bold; cursor: pointer;">-</button>
+                    <span style="font-weight: bold;">${item.qty}</span>
+                    <button onclick="updateQuantity(${item.product.id}, 1)" style="background: #0baf65; color: white; border: none; border-radius: 4px; padding: 2px 8px; font-weight: bold; cursor: pointer;">+</button>
+                </div>
+            </li>
+        `;
+    }).join('');
+
+    const totalCount = items.reduce((sum, item) => sum + item.qty, 0);
+    const totalPrice = items.reduce((sum, item) => {
+        const p = item.product.deal_price ? item.product.deal_price : item.product.price;
+        return sum + (parseFloat(p) * item.qty);
+    }, 0);
+
+    const headerCartCountEl = document.getElementById("header-cart-count");
+    if (headerCartCountEl) {
+        headerCartCountEl.innerText = totalCount;
+    }
+
+    const countRuleEl = document.getElementById("item-count-rule");
+    const priceRuleEl = document.getElementById("price-rule");
+    const checkoutBtn = document.getElementById("checkout-btn");
+
+    const hasMinItems = totalCount >= 3;
+    const hasMinPrice = totalPrice >= 249.00;
+
+    if (countRuleEl) {
+        countRuleEl.innerHTML = hasMinItems ? `✅ Total Items: ${totalCount} (Minimum Met)` : `❌ Total Items: ${totalCount} / 3 min`;
+        countRuleEl.style.color = hasMinItems ? "#088a4f" : "#e53e3e";
+    }
+
+    if (priceRuleEl) {
+        priceRuleEl.innerHTML = hasMinPrice ? `✅ Total: K ${totalPrice.toFixed(2)} (Minimum Met)` : `❌ Total: K ${totalPrice.toFixed(2)} / K 249.00 min`;
+        priceRuleEl.style.color = hasMinPrice ? "#088a4f" : "#e53e3e";
+    }
+
+    if (checkoutBtn) {
+        checkoutBtn.disabled = !(hasMinItems && hasMinPrice);
+        checkoutBtn.innerText = (hasMinItems && hasMinPrice) 
+            ? `Place Combo Order (K ${totalPrice.toFixed(2)})` 
+            : "Build Min Combo (3 Items & K249) to Order";
+    }
+}
+
+// 12. CHECKOUT PREVIEW MODAL FLOW
+function handleCheckout(event) {
+    event.preventDefault();
+
+    const items = Object.values(cart);
+    const totalCount = items.reduce((sum, item) => sum + item.qty, 0);
+    const totalPrice = items.reduce((sum, item) => {
+        const p = item.product.deal_price ? item.product.deal_price : item.product.price;
+        return sum + (parseFloat(p) * item.qty);
+    }, 0);
+
+    if (totalCount < 3 || totalPrice < 249.00) {
+        updateCartUI();
+        return alert("Combo criteria not met!");
+    }
+
+    const contactPhone = document.getElementById("customer-phone").value.trim();
+    const cTitle = document.getElementById("customer-title").value;
+    const cFirstName = document.getElementById("customer-first-name").value.trim();
+    const cLastName = document.getElementById("customer-last-name").value.trim();
+    const selectedOffice = document.getElementById("workplace-select").value;
     
-    const { data, error } = await db
-        .from('orders')
-        .update({ fulfillment_status: newStatus })
-        .eq('id', orderId)
-        .select();
-    
-    if (error) {
-        alert("Database Error: " + error.message);
-    } else if (!data || data.length === 0) {
-        alert("Update blocked! Check your Supabase RLS policies for the 'orders' table.");
-    } else {
-        alert(`Order #${orderId} fulfillment status updated to "${newStatus}" successfully!`);
-        loadAdminOrders();
+    const paymentMethodSelect = document.getElementById("payment-method-select");
+    const paymentMethod = paymentMethodSelect ? paymentMethodSelect.value : "";
+
+    if (!paymentMethod) {
+        alert("Please select a payment option before checkout.");
+        return;
+    }
+
+    document.getElementById("preview-customer-details").innerHTML = `
+        <strong>${cTitle} ${cFirstName} ${cLastName}</strong><br>
+        <small>📱 Phone: ${contactPhone}</small><br>
+        <small>📍 Delivery Point: <strong>${selectedOffice}</strong></small>
+    `;
+
+    document.getElementById("preview-items-list").innerHTML = items.map(item => {
+        const effectivePrice = item.product.deal_price ? item.product.deal_price : item.product.price;
+        return `
+            <div style="display: flex; justify-content: space-between; font-size: 0.82rem; margin-bottom: 6px;">
+                <span>${item.qty}x ${item.product.name}</span>
+                <strong>K ${(parseFloat(effectivePrice) * item.qty).toFixed(2)}</strong>
+            </div>
+        `;
+    }).join('');
+
+    document.getElementById("preview-payment-method").innerText = paymentMethod;
+    document.getElementById("preview-total-amount").innerText = `K ${totalPrice.toFixed(2)}`;
+
+    document.getElementById("order-preview-modal").style.display = "flex";
+    document.getElementById("order-preview-overlay").style.display = "block";
+}
+
+function closeOrderPreview() {
+    document.getElementById("order-preview-modal").style.display = "none";
+    document.getElementById("order-preview-overlay").style.display = "none";
+}
+
+async function executeFinalOrderSubmission() {
+    closeOrderPreview();
+
+    try {
+        const btn = document.getElementById("checkout-btn");
+        if (btn) {
+            btn.innerText = "⏳ Submitting Order...";
+            btn.disabled = true;
+        }
+
+        const items = Object.values(cart);
+        const totalPrice = items.reduce((sum, item) => {
+            const p = item.product.deal_price ? item.product.deal_price : item.product.price;
+            return sum + (parseFloat(p) * item.qty);
+        }, 0);
+
+        // 1. FINANCE HEAD GUARDRAIL: Check Selling Price vs Cost Price & Stock Availability (with sell_oos check)
+        for (const item of items) {
+            const prodId = item.product.id;
+            const orderQty = item.qty;
+            const effectivePrice = parseFloat(item.product.deal_price || item.product.price || 0);
+            const itemCost = parseFloat(item.product.cost_price || 0);
+
+            // Guardrail A: Zero Selling Below Cost (Internal block, friendly customer message)
+if (effectivePrice < itemCost) {
+    throw new Error(`We are currently updating pricing for "${item.product.name}". Please remove it from your cart or contact support to proceed.`);
+}
+
+            // Guardrail B: Stock Availability Check with sell_oos override
+            const { data: liveProd, error: stockCheckErr } = await db.from('products').select('stock_qty, name, sell_oos').eq('id', prodId).single();
+            if (stockCheckErr || !liveProd) throw new Error(`Could not verify stock for ${item.product.name}`);
+
+            const currentStock = liveProd.stock_qty || 0;
+            const sellOos = liveProd.sell_oos || 'N';
+
+            if (currentStock < orderQty) {
+                if (sellOos === 'Y') {
+                    // Allowed to go negative per sell_oos override
+                    console.log(`Allowing OOS sale for "${liveProd.name}". Stock will drop into negative values.`);
+                } else {
+                    throw new Error(`Insufficient stock for "${liveProd.name}". Only ${currentStock} units available.`);
+                }
+            }
+        }
+
+        const contactPhone = document.getElementById("customer-phone").value.trim();
+        const cTitle = document.getElementById("customer-title").value;
+        const cFirstName = document.getElementById("customer-first-name").value.trim();
+        const cLastName = document.getElementById("customer-last-name").value.trim();
+        const selectedOffice = document.getElementById("workplace-select").value;
+        
+        const paymentMethodSelect = document.getElementById("payment-method-select");
+        const paymentMethod = paymentMethodSelect ? paymentMethodSelect.value : "Cash on Delivery";
+        const initialPaymentStatus = paymentMethod === 'Cash on Delivery' ? 'Pending Collection' : 'Pending Gateway';
+
+        // Upsert Customer Record
+        await db.from('customers').upsert([{
+            phone_number: contactPhone,
+            title: cTitle,
+            first_name: cFirstName,
+            last_name: cLastName,
+            default_office: selectedOffice,
+            last_order_at: new Date().toISOString()
+        }], { onConflict: 'phone_number' });
+
+        // 2. Insert Order
+        const { data: newOrder, error: orderError } = await db.from('orders').insert([{
+            customer_phone: contactPhone,
+            delivery_location: selectedOffice,
+            total_amount: totalPrice,
+            order_items_json: items,
+            payment_method: paymentMethod,
+            payment_status: initialPaymentStatus,
+            fulfillment_status: 'Order Placed',
+            status: 'Pending Aggregation'
+        }]).select().single();
+
+        if (orderError) throw new Error("Orders Table Error: " + orderError.message);
+
+        // 3. AUTOMATED INVENTORY DEDUCTION (Deduct stock, allowing negative stock if sell_oos is 'Y')
+        for (const item of items) {
+            const prodId = item.product.id;
+            const orderQty = item.qty;
+
+            // Fetch latest stock to prevent race conditions
+            const { data: currentP } = await db.from('products').select('stock_qty').eq('id', prodId).single();
+            const updatedStock = (currentP.stock_qty || 0) - orderQty; // Permits negative values
+
+            await db.from('products').update({ stock_qty: updatedStock }).eq('id', prodId);
+        }
+
+        // Save Custom Combo Template & Reset Cart
+        await saveCustomerCustomCombo(contactPhone, items);
+        loadCustomerCustomCombos(contactPhone);
+
+        localStorage.setItem("padesk_phone", contactPhone);
+        localStorage.setItem("padesk_title", cTitle);
+        localStorage.setItem("padesk_first_name", cFirstName);
+        localStorage.setItem("padesk_last_name", cLastName);
+        localStorage.setItem("padesk_office", selectedOffice);
+
+        cart = {};
+        updateCartUI();
+        autoPopulateSavedCustomer();
+        
+        const displayOrderNo = newOrder && newOrder.order_number ? newOrder.order_number : "Successfully";
+        alert(`Zikomo ${cTitle} ${cLastName || cFirstName}! Order ${displayOrderNo} has been placed. Stock levels have been automatically updated.`);
+
+    } catch (error) {
+        console.error(error);
+        alert("Order Submission Blocked:\n" + error.message);
+        updateCartUI();
+    }
+}
+
+// 13. SMART CUSTOM COMBO SAVER WITH DUPLICATE PREVENTION
+async function saveCustomerCustomCombo(phone, items) {
+    try {
+        const signatureParts = items.map(i => `${i.product.id}:${i.qty}`).sort();
+        const productSignature = signatureParts.join(',');
+
+        const { data: existingCombos } = await db
+            .from('customer_combos')
+            .select('id')
+            .eq('customer_phone', phone)
+            .eq('product_signature', productSignature);
+
+        if (existingCombos && existingCombos.length > 0) {
+            return;
+        }
+
+        const topBrands = [...new Set(items.map(i => i.product.brand).filter(Boolean))];
+        const comboName = topBrands.length > 0 
+            ? `${topBrands.slice(0, 2).join(' & ')} Office Bundle` 
+            : `Custom Office Combo #${Math.floor(Math.random() * 900) + 100}`;
+
+        await db.from('customer_combos').insert([{
+            customer_phone: phone,
+            combo_name: comboName,
+            items_json: items,
+            product_signature: productSignature
+        }]);
+    } catch (err) {
+        console.error("Error saving custom combo template:", err);
     }
 }
