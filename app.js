@@ -412,10 +412,14 @@ async function loadStockHoldings() {
 }
 
 // --- BI ANALYTICS DASHBOARD ---
+// --- BI ANALYTICS DASHBOARD ---
 async function loadBIDashboard() {
     try {
-        const { data: orders } = await db.from('orders').select('total_amount, order_items_json');
-        const { count: customerCount } = await db.from('customers').select('*', { count: 'exact', head: true });
+        const { data: orders, error: orderErr } = await db.from('orders').select('total_amount, order_items_json');
+        if (orderErr) console.error("Orders fetch error:", orderErr.message);
+
+        const { count: customerCount, error: custErr } = await db.from('customers').select('*', { count: 'exact', head: true });
+        if (custErr) console.error("Customers fetch error:", custErr.message);
         
         let totalSales = 0;
         let totalOrderCount = orders ? orders.length : 0;
@@ -427,14 +431,15 @@ async function loadBIDashboard() {
                 
                 const items = o.order_items_json || [];
                 items.forEach(item => {
-                    const pid = item.product.id;
+                    const prod = item.product || {};
+                    const pid = prod.id || item.product_id || 0;
                     const qty = item.qty || 1;
-                    const revenue = (parseFloat(item.product.deal_price || item.product.price || 0)) * qty;
+                    const revenue = (parseFloat(prod.deal_price || prod.price || 0)) * qty;
                     
                     if (!productTracker[pid]) {
                         productTracker[pid] = {
-                            name: item.product.name,
-                            brand: item.product.brand || 'General',
+                            name: prod.name || 'Unknown Product',
+                            brand: prod.brand || 'General',
                             unitsSold: 0,
                             revenue: 0
                         };
@@ -469,6 +474,46 @@ async function loadBIDashboard() {
         }
     } catch (err) {
         console.error("Error loading BI dashboard:", err);
+    }
+}
+
+// --- PROFIT & LOSS REPORT ---
+async function loadPnLReport() {
+    try {
+        const { data: orders, error } = await db.from('orders').select('total_amount, order_items_json').eq('fulfillment_status', 'Delivered');
+        if (error) throw error;
+
+        let totalRevenue = 0;
+        let totalCOGS = 0;
+
+        if (orders) {
+            orders.forEach(o => {
+                totalRevenue += parseFloat(o.total_amount || 0);
+                
+                const items = o.order_items_json || [];
+                items.forEach(item => {
+                    const prod = item.product || {};
+                    const historicalCost = parseFloat(prod.cost_price || 0);
+                    const qty = item.qty || 1;
+                    totalCOGS += (historicalCost * qty);
+                });
+            });
+        }
+
+        const grossProfit = totalRevenue - totalCOGS;
+        const grossMarginPct = totalRevenue > 0 ? ((grossProfit / totalRevenue) * 100) : 0;
+
+        document.getElementById('pnl-revenue').innerText = `K ${totalRevenue.toFixed(2)}`;
+        document.getElementById('pnl-cogs').innerText = `(K ${totalCOGS.toFixed(2)})`;
+        
+        const profitEl = document.getElementById('pnl-profit');
+        profitEl.innerText = `K ${grossProfit.toFixed(2)}`;
+        profitEl.style.color = grossProfit >= 0 ? '#0baf65' : '#e53e3e';
+
+        document.getElementById('pnl-margin').innerText = `${grossMarginPct.toFixed(2)}%`;
+
+    } catch (err) {
+        console.error("Error loading P&L:", err);
     }
 }
 
