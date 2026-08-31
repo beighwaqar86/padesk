@@ -25,6 +25,11 @@ function switchAdminTab(tabName) {
         targetBtn.style.background = '#0baf65';
         targetBtn.style.color = 'white';
     }
+
+    // Refresh product list for purchases when switching to the tab
+    if (tabName === 'purchases') {
+        loadPurchaseProductDropdown();
+    }
 }
 
 // --- PRODUCTS CRUD ---
