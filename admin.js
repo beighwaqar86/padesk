@@ -250,9 +250,10 @@ async function loadPurchasesHistory() {
         }
 
         tbody.innerHTML = purchases.map(p => {
-            // Strictly pull from DB; leave empty if not present on legacy records
             const poCode = p.po_code || '-';
-            const invDate = p.invoice_date || p.purchase_date || '-';
+            
+            // STRICTLY fetch invoice_date from DB only. Do NOT fallback to purchase_date or current date.
+            const invDate = p.invoice_date || '-';
             const invRef = p.invoice_ref || '-';
 
             const prodName = p.products ? p.products.name : 'Unknown Product';
