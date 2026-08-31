@@ -65,7 +65,7 @@ async function loadAdminProducts() {
             <tr style="border-bottom:1px solid #edf2f7;">
                 <td style="padding:8px;">${p.product_code || '-'}</td>
                 <td style="padding:8px;"><strong>${p.name}</strong></td>
-                <td style="padding:8px;"><span style="background:#e6f7f0; color:#0baf65; padding:2px 6px; border-radius:4px; font-size:0.7rem; font-weight:bold;">${p.business || ''}</span> / ${p.category}</td>
+                <td style="padding:8px;"><span style="background:#e6f7f0; color:#0baf65; padding:2px 6px; border-radius:4px; font-size:0.7rem; font-weight:bold;">${p.business \vert{}\vert{} ''}</span> /${p.category}</td>
                 <td style="padding:8px;">K ${parseFloat(p.deal_price || p.price).toFixed(2)}</td>
                 <td style="padding:8px; text-align:center;">
                     <button type="button" onclick='editProduct(${JSON.stringify(p)})' style="background:#3182ce; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;">Edit</button>
@@ -148,7 +148,7 @@ async function loadPurchaseProductDropdown() {
         if (error) throw error;
 
         selectEl.innerHTML = '<option value="">-- Choose Product --</option>' + (products || []).map(p => `
-            <option value="${p.id}">${p.name} (Code: ${p.product_code || '-'} | Current Cost: K ${parseFloat(p.cost_price || 0).toFixed(2)})</option>
+            <option value="${p.id}">${p.name} (Code: ${p.product_code \vert{}\vert{} '-'} \vert{} Current Cost: K${parseFloat(p.cost_price || 0).toFixed(2)})</option>
         `).join('');
     } catch (err) {
         console.error("Error loading product dropdown:", err);
@@ -176,13 +176,12 @@ async function recordPurchase(event) {
         const currentSellingPrice = parseFloat(prod.deal_price || prod.price);
         
         if (unitCost > currentSellingPrice) {
-            const confirmOverride = confirm(`⚠️ FINANCIAL ALERT: Purchase unit cost (K ${unitCost.toFixed(2)}) is HIGHER than the current selling price (K ${currentSellingPrice.toFixed(2)})! This will result in an immediate loss. Do you still want to proceed?`);
+            const confirmOverride = confirm(`⚠️ FINANCIAL ALERT: Purchase unit cost (K ${unitCost.toFixed(2)}) is HIGHER than current selling price (K${currentSellingPrice.toFixed(2)})! Proceed?`);
             if (!confirmOverride) return;
         }
 
-        // Generate unique PO Code based on Invoice Date (e.g., PO3108202601)
-        const dParts = invoiceDate.split('-'); // Expecting YYYY-MM-DD
-        const dateStr = `${dParts[2]}${dParts[1]}${dParts[0]}`; // DDMMYYYY
+        const dParts = invoiceDate.split('-');
+        const dateStr = `${dParts[2]}${dParts[1]}${dParts[0]}`;
         
         const { count } = await db.from('purchases').select('*', { count: 'exact', head: true }).eq('invoice_date', invoiceDate);
         const seqNum = String((count || 0) + 1).padStart(2, '0');
@@ -215,4 +214,98 @@ async function recordPurchase(event) {
         
         loadAdminProducts();
         loadStockHoldings();
-        loadPurchasesHistory
+        loadPurchasesHistory();
+        loadPurchaseProductDropdown();
+
+    } catch (err) {
+        console.error("Purchase error:", err);
+        alert("Failed to record purchase: " + err.message);
+    }
+}
+
+async function loadPurchasesHistory() {
+    const tbody = document.getElementById("admin-purchases-history-table");
+    if (!tbody) return;
+
+    try {
+        const { data: purchases, error } = await db.from('purchases').select('*, products(name, product_code)').order('id', { ascending: false });
+        if (error) throw error;
+
+        if (!purchases || purchases.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" style="padding: 15px; text-align: center; color: #718096;">No purchase orders recorded yet.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = purchases.map(p => {
+            let poCode = p.po_code;
+            const invDate = p.invoice_date || p.purchase_date;
+
+            if (!poCode) {
+                const pDate = invDate ? new Date(invDate) : new Date(p.created_at || Date.now());
+                const day = String(pDate.getDate()).padStart(2, '0');
+                const month = String(pDate.getMonth() + 1).padStart(2, '0');
+                const year = pDate.getFullYear();
+                poCode = `PO${day}${month}${year}${String(p.id).padStart(2, '0')}`;
+            }
+
+            const prodName = p.products ? p.products.name : 'Unknown Product';
+            const totalCost = p.qty_received * parseFloat(p.purchase_unit_cost);
+            const formattedDate = invDate || (p.created_at ? p.created_at.split('T')[0] : '-');
+
+            return `
+                <tr style="border-bottom: 1px solid #edf2f7;">
+                    <td style="padding: 9px; font-weight: bold; color: #2b6cb0;">${poCode}</td>
+                    <td style="padding: 9px; color: #4a5568; white-space: nowrap;">${formattedDate}</td>
+                    <td style="padding: 9px;">${p.supplier_name}</td>
+                    <td style="padding: 9px; font-weight: 600;">${prodName}</td>
+                    <td style="padding: 9px; text-align: center;">${p.qty_received}</td>
+                    <td style="padding: 9px; text-align: right;">K ${parseFloat(p.purchase_unit_cost).toFixed(2)}</td>
+                    <td style="padding: 9px; text-align: right; font-weight: bold; color: #0baf65;">K ${totalCost.toFixed(2)}</td>
+                </tr>
+            `;
+        }).join('');
+    } catch (err) {
+        console.error("Error loading purchases history:", err);
+        tbody.innerHTML = `<tr><td colspan="7" style="padding: 15px; text-align: center; color: red;">Failed to load purchase history.</td></tr>`;
+    }
+}
+
+// --- STOCK ON HAND ---
+async function loadStockHoldings() {
+    const tbody = document.getElementById("admin-stock-holdings-table");
+    if (!tbody) return;
+
+    try {
+        const { data: products, error } = await db.from('products').select('*').order('name');
+        if (error) throw error;
+
+        if (!products || products.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="padding: 15px; text-align: center;">No products found in inventory.</td></tr>';
+            return;
+        }
+
+        let totalInventoryCapital = 0;
+
+        tbody.innerHTML = products.map(p => {
+            const qty = p.stock_qty || 0;
+            const unitCost = parseFloat(p.cost_price || 0);
+            const totalVal = qty * unitCost;
+            totalInventoryCapital += totalVal;
+
+            const stockBadgeStyle = qty <= 0 
+                ? 'background: #fed7d7; color: #c53030; padding: 2px 8px; border-radius: 4px; font-weight: bold;'
+                : 'background: #e6f7f0; color: #0baf65; padding: 2px 8px; border-radius: 4px; font-weight: bold;';
+
+            return `
+                <tr style="border-bottom: 1px solid #edf2f7;">
+                    <td style="padding: 10px; color: #4a5568;">${p.product_code || '-'}</td>
+                    <td style="padding: 10px; font-weight: 600;">${p.name}</td>
+                    <td style="padding: 10px; text-align: center;"><span style="${stockBadgeStyle}">${qty} units</span></td>
+                    <td style="padding: 10px; text-align: right;">K ${unitCost.toFixed(2)}</td>
+                    <td style="padding: 10px; text-align: right; font-weight: bold;">K ${totalVal.toFixed(2)}</td>
+                </tr>
+            `;
+        }).join('') + `
+            <tr style="background: #f8fafc; font-weight: bold; border-top: 2px solid #cbd5e0;">
+                <td colspan="4" style="padding: 12px; text-align: right;">Total Inventory Asset Value:</td>
+                <td
