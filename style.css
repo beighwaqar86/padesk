@@ -117,19 +117,19 @@ body {
     overflow-x: auto;
     scroll-snap-type: x mandatory;
     scroll-behavior: smooth;
-    gap: 0px; /* Remove gaps so each card fills 100% cleanly */
+    gap: 0px;
     width: 100%;
-    scrollbar-width: none; /* Hide scrollbar for clean UI */
+    scrollbar-width: none;
 }
 
 #banner-carousel::-webkit-scrollbar {
     display: none;
 }
 
-/* Each slide takes 100% of the parent width */
 .banner-card {
     flex: 0 0 100% !important;
     width: 100% !important;
+    min-height: 150px !important; /* Restores the original tall, spacious card height */
     scroll-snap-align: start;
     box-sizing: border-box;
 }
