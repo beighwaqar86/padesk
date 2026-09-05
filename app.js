@@ -41,12 +41,20 @@ window.onload = function() {
     autoPopulateSavedCustomer();
 };
 
-// Scroll to cart selection section when header cart graphic is clicked
+// Opens/closes the cart drawer. Pass true to force it open (e.g. after adding a combo).
+function toggleCartDrawer(forceOpen) {
+    const drawer = document.getElementById("cart-section");
+    const overlay = document.getElementById("cart-drawer-overlay");
+    if (!drawer || !overlay) return;
+
+    const shouldOpen = forceOpen === true ? true : !drawer.classList.contains("open");
+    drawer.classList.toggle("open", shouldOpen);
+    overlay.style.display = shouldOpen ? "block" : "none";
+}
+
+// Kept for any older callers — now opens the cart drawer instead of scrolling
 function scrollToCartSection() {
-    const cartSection = document.getElementById("cart-section");
-    if (cartSection) {
-        cartSection.scrollIntoView({ behavior: 'smooth' });
-    }
+    toggleCartDrawer(true);
 }
 
 // 1. AUTO-POPULATE & STATE BAR ENGINE
@@ -872,10 +880,10 @@ function addToCart(product, event) {
         }, 800);
     }
 
-    const cartCard = document.getElementById("cart-section");
-    if (cartCard) {
-        cartCard.classList.add("pulse");
-        setTimeout(() => cartCard.classList.remove("pulse"), 300);
+    const floatingBtn = document.getElementById("floating-cart-btn");
+    if (floatingBtn) {
+        floatingBtn.classList.add("pulse");
+        setTimeout(() => floatingBtn.classList.remove("pulse"), 300);
     }
 }
 
@@ -922,6 +930,11 @@ function updateCartUI() {
     const headerCartCountEl = document.getElementById("header-cart-count");
     if (headerCartCountEl) {
         headerCartCountEl.innerText = totalCount;
+    }
+
+    const floatingCartCountEl = document.getElementById("floating-cart-count");
+    if (floatingCartCountEl) {
+        floatingCartCountEl.innerText = totalCount;
     }
 
     const countRuleEl = document.getElementById("item-count-rule");
@@ -997,6 +1010,7 @@ function handleCheckout(event) {
     const deliveryDayEl = document.getElementById("preview-delivery-day");
     if (deliveryDayEl) deliveryDayEl.innerText = getNextDeliveryDayLabel();
 
+    toggleCartDrawer(false);
     document.getElementById("order-preview-modal").style.display = "flex";
     document.getElementById("order-preview-overlay").style.display = "block";
 }
