@@ -52,10 +52,16 @@
             placeholder="🔍 Search name, code, category, brand..." 
             oninput="applyFilters()"
         >
-        <button type="button" class="btn-filter-toggle" onclick="scrollToCartSection()" style="background: #0baf65; color: white; display: flex; align-items: center; gap: 6px; border: none; cursor: pointer; padding: 10px 14px; border-radius: 8px; font-weight: bold;">
+        <button type="button" class="btn-filter-toggle" onclick="toggleCartDrawer()" style="background: #0baf65; color: white; display: flex; align-items: center; gap: 6px; border: none; cursor: pointer; padding: 10px 14px; border-radius: 8px; font-weight: bold;">
             🛒 <span id="header-cart-count">0</span> items
         </button>
     </div>
+
+    <!-- Floating Cart Button (always reachable, no matter how far you've scrolled) -->
+    <button type="button" id="floating-cart-btn" class="floating-cart-btn" onclick="toggleCartDrawer()">
+        🛒
+        <span id="floating-cart-count" class="floating-cart-badge">0</span>
+    </button>
 
     <!-- Product Grid -->
     <main class="content-container">
@@ -75,9 +81,15 @@
         <div id="past-purchases-slider" class="past-purchases-slider"></div>
     </section>
 
-    <!-- Sticky Bottom Cart Sheet -->
-    <section id="cart-section" class="cart-card">
-        <h3>🛒 Your Combo Selection</h3>
+    <!-- Cart Drawer (slides up from bottom; reachable from anywhere via the floating button) -->
+    <div id="cart-drawer-overlay" class="sidebar-overlay" onclick="toggleCartDrawer()"></div>
+    <section id="cart-section" class="cart-drawer">
+        <div class="cart-drawer-handle"></div>
+        <div class="sidebar-header">
+            <h3>🛒 Your Combo Selection</h3>
+            <button type="button" class="btn-close-sidebar" onclick="toggleCartDrawer()">✕</button>
+        </div>
+        <div class="cart-drawer-scroll">
         <ul id="cart-items"></ul>
         
         <div class="combo-tracker">
@@ -138,6 +150,7 @@
 
             <button type="submit" id="checkout-btn" class="btn-primary" disabled>Build Min Combo (3 Items & K249) to Order</button>
         </form>
+        </div>
     </section>
 
     <!-- Order Preview / Confirmation Modal -->
