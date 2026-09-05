@@ -104,6 +104,41 @@ body {
     box-shadow: 0 0 0 3px rgba(11, 175, 101, 0.1);
 }
 
+/* Customer Profile: Title / First Name / Last Name in one professional row */
+.name-field-row {
+    display: flex;
+    gap: 8px;
+}
+
+.name-field {
+    flex: 1;
+    min-width: 0; /* lets flex children shrink below their content width instead of overflowing */
+}
+
+.name-field-title {
+    flex: 0 0 68px;
+}
+
+.name-field label {
+    display: block;
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: #718096;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    margin-bottom: 4px;
+}
+
+.name-field .form-input {
+    padding: 10px 8px;
+    font-size: 0.88rem;
+}
+
+.name-field-title .form-input {
+    padding-left: 6px;
+    padding-right: 2px;
+}
+
 /* Hero Banner Touch Slider */
 .banner-section {
     position: relative;
