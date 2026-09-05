@@ -11,6 +11,8 @@ window.onload = function() {
         loadPurchaseProductDropdown();
         loadStockHoldings();
         loadPurchasesHistory();
+        loadStockRequests();
+        loadReminderOptIns();
         
         // Load Analytics and P&L on initial startup if dashboard tab is active
         loadBIDashboard();
@@ -55,6 +57,10 @@ function switchAdminTab(tabName) {
     }
     if (tabName === 'stock') {
         loadStockHoldings();
+    }
+    if (tabName === 'notifications') {
+        loadStockRequests();
+        loadReminderOptIns();
     }
 }
 
@@ -535,6 +541,92 @@ async function deleteBanner(id) {
     loadAdminBanners();
 }
 
+// --- NOTIFICATIONS: RESTOCK REQUESTS & DELIVERY REMINDER OPT-INS ---
+async function loadStockRequests() {
+    const tbody = document.getElementById("admin-stock-requests-table");
+    if (!tbody) return;
+
+    try {
+        const { data: requests, error } = await db
+            .from('stock_notifications')
+            .select('*, products(name, product_code, stock_qty)')
+            .order('created_at', { ascending: false });
+        if (error) throw error;
+
+        if (!requests || requests.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="padding: 15px; text-align: center; color: #718096;">No restock requests yet.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = requests.map(r => {
+            const reqDate = r.created_at ? new Date(r.created_at).toLocaleDateString() : '-';
+            const prod = r.products || {};
+            const backInStock = (prod.stock_qty || 0) > 0;
+            const statusBadge = r.notified
+                ? `<span style="background:#e6f7f0; color:#0baf65; padding:2px 8px; border-radius:4px; font-weight:bold;">Notified</span>`
+                : (backInStock
+                    ? `<span style="background:#fffaf0; color:#975a16; padding:2px 8px; border-radius:4px; font-weight:bold;">Back in stock — pending</span>`
+                    : `<span style="background:#fed7d7; color:#c53030; padding:2px 8px; border-radius:4px; font-weight:bold;">Still out of stock</span>`);
+
+            return `
+                <tr style="border-bottom:1px solid #edf2f7;">
+                    <td style="padding:9px; color:#4a5568;">${reqDate}</td>
+                    <td style="padding:9px; font-weight:600;">${prod.name || 'Unknown product'} <small style="color:#718096;">(${prod.product_code || '-'})</small></td>
+                    <td style="padding:9px;">${r.phone_number}</td>
+                    <td style="padding:9px; text-align:center;">${statusBadge}</td>
+                    <td style="padding:9px; text-align:center;">
+                        ${!r.notified ? `<button type="button" onclick="markStockRequestNotified(${r.id})" style="background:#0baf65; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer; font-size:0.75rem;">Mark Notified</button>` : ''}
+                        <button type="button" onclick="deleteStockRequest(${r.id})" style="background:#e53e3e; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer; font-size:0.75rem; margin-left:4px;">Delete</button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    } catch (err) {
+        console.error("Error loading stock requests:", err);
+        tbody.innerHTML = `<tr><td colspan="5" style="padding: 15px; text-align: center; color: red;">Failed to load restock requests. If this table doesn't exist yet, run the provided db-migration.sql in Supabase first.</td></tr>`;
+    }
+}
+
+async function markStockRequestNotified(id) {
+    await db.from('stock_notifications').update({ notified: true }).eq('id', id);
+    loadStockRequests();
+}
+
+async function deleteStockRequest(id) {
+    if (!confirm("Delete this restock request?")) return;
+    await db.from('stock_notifications').delete().eq('id', id);
+    loadStockRequests();
+}
+
+async function loadReminderOptIns() {
+    const tbody = document.getElementById("admin-reminder-optins-table");
+    if (!tbody) return;
+
+    try {
+        const { data: customers, error } = await db
+            .from('customers')
+            .select('title, first_name, last_name, phone_number, default_office')
+            .eq('wants_delivery_reminder', true);
+        if (error) throw error;
+
+        if (!customers || customers.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="3" style="padding: 15px; text-align: center; color: #718096;">No customers have opted in yet.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = customers.map(c => `
+            <tr style="border-bottom:1px solid #edf2f7;">
+                <td style="padding:9px; font-weight:600;">${c.title || ''} ${c.first_name || ''} ${c.last_name || ''}</td>
+                <td style="padding:9px;">${c.phone_number}</td>
+                <td style="padding:9px; color:#4a5568;">${c.default_office || '-'}</td>
+            </tr>
+        `).join('');
+    } catch (err) {
+        console.error("Error loading reminder opt-ins:", err);
+        tbody.innerHTML = `<tr><td colspan="3" style="padding: 15px; text-align: center; color: red;">Failed to load opt-ins. If the "wants_delivery_reminder" column doesn't exist yet, run the provided db-migration.sql in Supabase first.</td></tr>`;
+    }
+}
+
 // --- FULFILLMENT ORDERS ---
 async function loadAdminOrders() {
     const { data: orders } = await db.from('orders').select('*').order('id', { ascending: false });
@@ -564,6 +656,7 @@ async function loadAdminOrders() {
                     <button type="button" onclick="toggleOrderDetails(${o.id})" style="background: #ebf8ff; color: #2b6cb0; border: 1px solid #bee3f8; padding: 4px 8px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 0.8rem;">
                         📋 ${orderNum} ▾
                     </button>
+                    ${o.has_stock_issue ? `<br><button type="button" onclick="resolveStockIssue(${o.id})" title="Click once the item shortage has been sorted" style="margin-top: 4px; background: #fffaf0; color: #975a16; border: 1px solid #f6d78e; padding: 3px 6px; border-radius: 6px; font-size: 0.68rem; font-weight: bold; cursor: pointer;">⚠️ Stock Issue — Mark Resolved</button>` : ''}
                 </td>
                 <td style="padding:10px;">
                     <strong>${customerName}</strong><br>
@@ -625,6 +718,15 @@ async function loadAdminOrders() {
             </tr>
         `;
     }).join('');
+}
+
+async function resolveStockIssue(orderId) {
+    const { error } = await db.from('orders').update({ has_stock_issue: false }).eq('id', orderId);
+    if (error) {
+        alert("Could not clear the flag: " + error.message);
+    } else {
+        loadAdminOrders();
+    }
 }
 
 function toggleOrderDetails(orderId) {
