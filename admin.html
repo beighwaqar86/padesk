@@ -3,121 +3,253 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PaDesk - Management Hub</title>
+    <title>PaDesk - Direct Office Combos</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
-<body style="background: #f7fafc; padding: 20px;">
+<body>
 
-    <div style="max-width: 1200px; margin: 0 auto; background: white; padding: 24px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
-        
-        <!-- Header -->
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #edf2f7; padding-bottom: 12px;">
-            <h2 style="margin: 0; color: #1a202c;">⚙️ PaDesk Management Hub</h2>
-            <a href="index.html" style="background: #edf2f7; color: #2d3748; padding: 8px 14px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 0.85rem;">← Back to Store</a>
-        </div>
-
-        <!-- Navigation Tabs -->
-        <div style="display: flex; gap: 10px; margin-bottom: 24px; flex-wrap: wrap;">
-            <button type="button" onclick="switchAdminTab('products')" id="tab-btn-products" style="background: #0baf65; color: white; border: none; padding: 10px 16px; border-radius: 8px; font-weight: bold; cursor: pointer;">📦 Products Master</button>
-            <button type="button" onclick="switchAdminTab('purchases')" id="tab-btn-purchases" style="background: #edf2f7; color: #4a5568; border: none; padding: 10px 16px; border-radius: 8px; font-weight: bold; cursor: pointer;">📥 Purchases & Stock</button>
-            <button type="button" onclick="switchAdminTab('banners')" id="tab-btn-banners" style="background: #edf2f7; color: #4a5568; border: none; padding: 10px 16px; border-radius: 8px; font-weight: bold; cursor: pointer;">⚡ Ready-Made Combos</button>
-            <button type="button" onclick="switchAdminTab('fulfillment')" id="tab-btn-fulfillment" style="background: #edf2f7; color: #4a5568; border: none; padding: 10px 16px; border-radius: 8px; font-weight: bold; cursor: pointer;">🚚 Order Fulfillment</button>
-        </div>
-
-        <!-- TAB 1: PRODUCTS MASTER -->
-        <div id="admin-tab-products" class="admin-tab-content">
-            <h3>Products Master Inventory</h3>
-            <div style="overflow-x: auto;">
-                <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem;">
-                    <thead>
-                        <tr style="background: #f7fafc; border-bottom: 2px solid #e2e8f0; color: #4a5568;">
-                            <th style="padding: 8px;">Code</th>
-                            <th style="padding: 8px;">Name</th>
-                            <th style="padding: 8px;">Category</th>
-                            <th style="padding: 8px;">Price</th>
-                            <th style="padding: 8px; text-align: center;">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="admin-product-table">
-                        <tr><td colspan="5" style="padding: 20px; text-align: center;">Loading products inventory...</td></tr>
-                    </tbody>
-                </table>
+    <!-- Top App Header -->
+    <header class="app-header">
+        <div class="brand">
+            <img src="images/pa-desk-icon.svg" alt="Pa-Desk" class="brand-logo">
+            <div>
+                <h1>PaDesk</h1>
+                <small>Office Gate Delivery</small>
             </div>
         </div>
+        <button type="button" id="account-btn" class="btn-account" onclick="toggleAccountDrawer()">
+            👤 Account
+        </button>
+    </header>
 
-        <!-- TAB 2: PURCHASES & STOCK INTAKE -->
-        <div id="admin-tab-purchases" class="admin-tab-content" style="display: none;">
-            <div style="background: white; padding: 20px; border-radius: 10px; border: 1px solid #e2e8f0; margin-bottom: 20px;">
-                <h3 style="margin-top: 0; color: #1a202c; font-size: 1.1rem;">📦 Record New Stock Purchase</h3>
-                <form id="purchase-form" onsubmit="recordPurchase(event)" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; align-items: flex-end;">
-                    
-                    <div>
-                        <label style="font-size: 0.78rem; font-weight: bold; color: #4a5568;">Select Product (SKU)</label>
-                        <select id="purchase-product-select" required style="width: 100%; padding: 8px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 0.85rem;">
-                            <option value="">-- Choose Product --</option>
-                        </select>
-                    </div>
+    <!-- Top State Bar: Welcome Back OR Quick-Login Prompt -->
+    <div id="user-state-bar" class="user-state-bar"></div>
 
-                    <div>
-                        <label style="font-size: 0.78rem; font-weight: bold; color: #4a5568;">Supplier Name</label>
-                        <input type="text" id="purchase-supplier" placeholder="e.g., Zamlec / Trade King" required style="width: 100%; padding: 8px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 0.85rem; box-sizing: border-box;">
-                    </div>
-
-                    <div>
-                        <label style="font-size: 0.78rem; font-weight: bold; color: #4a5568;">Invoice / PO Reference</label>
-                        <input type="text" id="purchase-invoice" placeholder="e.g., INV-9982" style="width: 100%; padding: 8px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 0.85rem; box-sizing: border-box;">
-                    </div>
-
-                    <div>
-                        <label style="font-size: 0.78rem; font-weight: bold; color: #4a5568;">Quantity Received</label>
-                        <input type="number" id="purchase-qty" placeholder="100" min="1" required style="width: 100%; padding: 8px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 0.85rem; box-sizing: border-box;">
-                    </div>
-
-                    <div>
-                        <label style="font-size: 0.78rem; font-weight: bold; color: #4a5568;">Purchase Unit Cost (K)</label>
-                        <input type="number" step="0.01" id="purchase-unit-cost" placeholder="0.00" min="0" required style="width: 100%; padding: 8px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 0.85rem; box-sizing: border-box;">
-                    </div>
-
-                    <div>
-                        <button type="submit" style="background: #0baf65; color: white; border: none; padding: 9px 16px; border-radius: 6px; font-weight: bold; cursor: pointer; width: 100%; font-size: 0.85rem;">Save & Restock</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-
-        <!-- TAB 3: READY-MADE COMBO BANNERS -->
-        <div id="admin-tab-banners" class="admin-tab-content" style="display: none;">
-            <h3>Ready-Made Combo Banners Manager</h3>
-            <div id="admin-banners-list">Loading banners...</div>
-        </div>
-
-        <!-- TAB 4: ORDER FULFILLMENT -->
-        <div id="admin-tab-fulfillment" class="admin-tab-content" style="display: none;">
-            <h3 style="margin-bottom: 4px;">Corporate Office Orders & Fulfillment</h3>
-            <p style="color: #718096; font-size: 0.85rem; margin-top: 0;">Review corporate purchases, expand items breakdown, and update fulfillment statuses.</p>
-            
-            <div style="overflow-x: auto;">
-                <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem;">
-                    <thead>
-                        <tr style="background: #f7fafc; border-bottom: 2px solid #e2e8f0; color: #4a5568;">
-                            <th style="padding: 10px;">ID</th>
-                            <th style="padding: 10px;">Order Date</th>
-                            <th style="padding: 10px;">Order Number</th>
-                            <th style="padding: 10px;">Customer Name</th>
-                            <th style="padding: 10px;">Total & Payment</th>
-                            <th style="padding: 10px;">Fulfillment Status & Action</th>
-                        </tr>
-                    </thead>
-                    <tbody id="admin-orders-table">
-                        <tr><td colspan="6" style="padding: 20px; text-align: center; color: #718096;">Loading fulfillment hub...</td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
+    <!-- Delivery Day Ticker -->
+    <div class="delivery-ticker">
+        🚛 Delivery: Tuesdays & Thursdays | Min Combo: 3 Items & K249 Total
     </div>
 
-    <script src="admin.js"></script>
+    <!-- Interactive Hero Banner Slider Area (Top Slider with + Add Combo on Top Right) -->
+    <section class="banner-section">
+        <div id="banner-carousel" class="banner-carousel"></div>
+        <div id="slider-dots" class="slider-dots"></div>
+    </section>
+
+    <!-- Hierarchical Circular Shortcuts (Business -> Category -> Subcategory) -->
+    <div class="circle-shortcuts-wrapper">
+        <div class="circle-shortcuts-container" id="business-circles"></div>
+        <div class="circle-shortcuts-container sub-circles" id="category-circles" style="display: none;"></div>
+        <div class="circle-shortcuts-container sub-circles" id="subcategory-circles" style="display: none;"></div>
+    </div>
+
+    <!-- Search Bar & Cart Quick-Jump Graphic Button -->
+    <div class="search-filter-bar">
+        <input 
+            type="text" 
+            id="search-input" 
+            placeholder="🔍 Search name, code, category, brand..." 
+            oninput="applyFilters()"
+        >
+        <button type="button" class="btn-filter-toggle" onclick="scrollToCartSection()" style="background: #0baf65; color: white; display: flex; align-items: center; gap: 6px; border: none; cursor: pointer; padding: 10px 14px; border-radius: 8px; font-weight: bold;">
+            🛒 <span id="header-cart-count">0</span> items
+        </button>
+    </div>
+
+    <!-- Product Grid -->
+    <main class="content-container">
+        <h3 class="section-title">Build Your Custom Combo</h3>
+        <div id="product-list" class="product-grid">Loading products...</div>
+    </main>
+
+    <!-- Customer Saved Custom Combos Section -->
+    <section id="custom-combos-section" class="past-purchases-section" style="display: none;">
+        <h3 class="section-title">⭐ My Saved Custom Combos</h3>
+        <div id="custom-combos-slider" class="past-purchases-slider"></div>
+    </section>
+
+    <!-- Create Combo from recent Purchases -->
+    <section id="past-purchases-section" class="past-purchases-section" style="display: none;">
+        <h3 class="section-title">⚡ Create Combo from recent Purchases</h3>
+        <div id="past-purchases-slider" class="past-purchases-slider"></div>
+    </section>
+
+    <!-- Sticky Bottom Cart Sheet -->
+    <section id="cart-section" class="cart-card">
+        <h3>🛒 Your Combo Selection</h3>
+        <ul id="cart-items"></ul>
+        
+        <div class="combo-tracker">
+            <div id="item-count-rule" class="rule-badge">❌ Items: 0 / 3 min</div>
+            <div id="price-rule" class="rule-badge">❌ Total: K 0.00 / K 249.00 min</div>
+        </div>
+
+        <form id="checkout-form" onsubmit="handleCheckout(event)">
+            
+            <div style="margin-bottom: 16px;">
+                <label for="workplace-select" style="display:block; font-weight:700; font-size:0.8rem; margin-bottom:6px; color:#4a5568;">📍 Delivery Point</label>
+                <select id="workplace-select" required class="form-input">
+                    <option value="">-- Choose your office --</option>
+                    <option value="New Government Complex">New Government Complex (Independence Ave)</option>
+                    <option value="Ministry of Finance">Ministry of Finance (Haile Selassie Ave)</option>
+                    <option value="Zanaco HQ">Zanaco HQ (Cairo Road)</option>
+                </select>
+            </div>
+
+            <div style="margin-bottom: 16px;">
+                <label for="payment-method-select" style="display:block; font-weight:700; font-size:0.8rem; margin-bottom:6px; color:#4a5568;">💳 Payment Option</label>
+                <select id="payment-method-select" required class="form-input">
+                    <option value="">-- Choose payment method --</option>
+                    <option value="Mobile Money">Mobile Money (MTN / Airtel)</option>
+                    <option value="VISA">VISA / Mastercard</option>
+                    <option value="Cash on Delivery">Cash on Delivery (CoD)</option>
+                </select>
+            </div>
+
+            <div style="margin-bottom: 16px;">
+                <label for="customer-phone" style="display:block; font-weight:700; font-size:0.8rem; margin-bottom:6px; color:#4a5568;">📱 WhatsApp Number</label>
+                <input 
+                    type="tel" 
+                    id="customer-phone" 
+                    placeholder="e.g. 0977123456" 
+                    oninput="checkReturningCustomer(this.value)" 
+                    required 
+                    class="form-input"
+                >
+            </div>
+
+            <div style="background: white; border: 1px solid #e2e8f0; padding: 16px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+                <label style="display:block; font-weight:800; font-size:0.85rem; margin-bottom:12px; color:#1a202c;">👤 CUSTOMER PROFILE</label>
+                
+                <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                    <select id="customer-title" required class="form-input" style="width: 35%; padding: 10px;">
+                        <option value="">Title</option>
+                        <option value="Mr.">Mr.</option>
+                        <option value="Mrs.">Mrs.</option>
+                        <option value="Ms.">Ms.</option>
+                        <option value="Dr.">Dr.</option>
+                    </select>
+                    <input type="text" id="customer-first-name" placeholder="First Name" required class="form-input" style="flex: 1; padding: 10px;">
+                </div>
+                
+                <input type="text" id="customer-last-name" placeholder="Last Name" required class="form-input" style="width: 100%; padding: 10px;">
+            </div>
+
+            <button type="submit" id="checkout-btn" class="btn-primary" disabled>Build Min Combo (3 Items & K249) to Order</button>
+        </form>
+    </section>
+
+    <!-- Order Preview / Confirmation Modal -->
+    <div id="order-preview-overlay" class="sidebar-overlay" onclick="closeOrderPreview()"></div>
+    <div id="order-preview-modal" class="order-preview-modal" style="display: none;">
+        <div class="sidebar-header">
+            <h3>📋 Review Your Order</h3>
+            <button type="button" class="btn-close-sidebar" onclick="closeOrderPreview()">✕</button>
+        </div>
+        <div class="sidebar-content">
+            <div class="account-profile-box" id="preview-customer-details"></div>
+
+            <h4 style="margin: 12px 0 6px; font-size: 0.9rem;">Items Summary</h4>
+            <div id="preview-items-list" style="max-height: 160px; overflow-y: auto; margin-bottom: 10px; border-bottom: 1px solid #edf2f7; padding-bottom: 6px;"></div>
+
+            <div style="font-size: 0.85rem; margin-bottom: 12px; background: #f7fafc; padding: 8px; border-radius: 6px;">
+                <span>Payment Method: <strong id="preview-payment-method" style="color: #2b6cb0;">-</strong></span>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; font-weight: 800; font-size: 1rem; margin-bottom: 16px;">
+                <span>Total Amount:</span>
+                <span id="preview-total-amount" style="color: #0baf65;">K 0.00</span>
+            </div>
+
+            <div style="display: flex; gap: 10px;">
+                <button type="button" onclick="closeOrderPreview()" style="flex: 1; background: #edf2f7; border: 1px solid #cbd5e0; padding: 12px; border-radius: 8px; font-weight: bold; cursor: pointer;">Edit Order</button>
+                <button type="button" onclick="executeFinalOrderSubmission()" class="btn-primary" style="flex: 1; padding: 12px;">Confirm & Submit</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Account Details Drawer -->
+    <div id="account-drawer-overlay" class="sidebar-overlay" onclick="toggleAccountDrawer()"></div>
+    <aside id="account-drawer" class="filter-sidebar">
+        <div class="sidebar-header">
+            <h3>My Account Profile</h3>
+            <button type="button" class="btn-close-sidebar" onclick="toggleAccountDrawer()">✕</button>
+        </div>
+        <div class="sidebar-content">
+            <div id="account-profile-info" class="account-profile-box"></div>
+            <h4 style="margin: 0; color: #2d3748;">📦 Order History</h4>
+    <button type="button" onclick="openFullOrderHistory()" style="background: none; border: none; color: #0baf65; font-size: 0.8rem; font-weight: bold; cursor: pointer;">View All ↗</button>
+            <div id="account-order-history" class="order-history-list"></div>
+            <button type="button" id="drawer-signout-btn" class="btn-danger" onclick="signOut()" style="display:none; margin-top: 20px;">
+                Sign Out
+            </button>
+        </div>
+    </aside>
+
+    <!-- Full-Screen Order Confirmation View -->
+    <div id="order-confirmation-view" class="order-confirmation-view" style="display: none;">
+        <div class="confirmation-scroll">
+            <div class="confirmation-success-icon">✓</div>
+            <h2 class="confirmation-heading">Order Confirmed!</h2>
+            <p id="confirmation-greeting" class="confirmation-greeting"></p>
+
+            <div class="confirmation-order-number">
+                Order <strong id="confirmation-order-no">-</strong>
+            </div>
+
+            <!-- Status Tracker -->
+            <div class="status-tracker" id="confirmation-status-tracker">
+                <div class="status-step active" data-step="placed">
+                    <div class="status-dot"></div>
+                    <span>Order Placed</span>
+                </div>
+                <div class="status-step" data-step="aggregating">
+                    <div class="status-dot"></div>
+                    <span>Aggregating</span>
+                </div>
+                <div class="status-step" data-step="delivery">
+                    <div class="status-dot"></div>
+                    <span>Out for Delivery</span>
+                </div>
+                <div class="status-step" data-step="delivered">
+                    <div class="status-dot"></div>
+                    <span>Delivered</span>
+                </div>
+            </div>
+
+            <!-- Order Summary Card -->
+            <div class="confirmation-card">
+                <h4>Order Summary</h4>
+                <ul id="confirmation-items-list" class="confirmation-items-list"></ul>
+                <div class="confirmation-total-row">
+                    <span>Total</span>
+                    <span id="confirmation-total">K 0.00</span>
+                </div>
+            </div>
+
+            <!-- Delivery Details Card -->
+            <div class="confirmation-card">
+                <h4>Delivery Details</h4>
+                <div class="confirmation-detail-row">
+                    <span>📍 Location</span>
+                    <span id="confirmation-office">-</span>
+                </div>
+                <div class="confirmation-detail-row">
+                    <span>🚛 Expected Delivery</span>
+                    <span id="confirmation-delivery-day">-</span>
+                </div>
+                <div class="confirmation-detail-row">
+                    <span>💳 Payment</span>
+                    <span id="confirmation-payment">-</span>
+                </div>
+            </div>
+
+            <button type="button" class="btn-primary" onclick="backToStore()">← Back to Store</button>
+            <button type="button" class="btn-link-view-history" onclick="backToStore(); openFullOrderHistory();">View in Order History</button>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
 </body>
 </html>
