@@ -1278,53 +1278,23 @@ function closeOrderPreview() {
 }
 
 async function executeFinalOrderSubmission() {
+    // Show the loading overlay in the same tick as closing the preview, so
+    // there is never a moment where the plain homepage is visible with no
+    // indication that anything is happening.
+    const overlay = document.getElementById("order-submitting-overlay");
+    if (overlay) overlay.style.display = "flex";
     closeOrderPreview();
 
     try {
-        const btn = document.getElementById("checkout-btn");
-        if (btn) {
-            btn.innerText = "⏳ Submitting Order...";
-            btn.disabled = true;
-        }
-
         const items = Object.values(cart);
         const { total: totalPrice } = getCartTotals(items);
-
-        // 1. FINANCE HEAD GUARDRAIL: Check Selling Price vs Cost Price & Stock Availability (with sell_oos check)
-        for (const item of items) {
-            const prodId = item.product.id;
-            const orderQty = item.qty;
-            const effectivePrice = parseFloat(item.product.deal_price || item.product.price || 0);
-            const itemCost = parseFloat(item.product.cost_price || 0);
-
-            // Guardrail A: Zero Selling Below Cost (Internal block, friendly customer message)
-if (effectivePrice < itemCost) {
-    throw new Error(`We are currently updating pricing for "${item.product.name}". Please remove it from your cart or contact support to proceed.`);
-}
-
-            // Guardrail B: Stock Availability Check with sell_oos override
-            const { data: liveProd, error: stockCheckErr } = await db.from('products').select('stock_qty, name, sell_oos').eq('id', prodId).single();
-            if (stockCheckErr || !liveProd) throw new Error(`Could not verify stock for ${item.product.name}`);
-
-            const currentStock = liveProd.stock_qty || 0;
-            const sellOos = liveProd.sell_oos || 'N';
-
-            if (currentStock < orderQty) {
-                if (sellOos === 'Y') {
-                    // Allowed to go negative per sell_oos override
-                    console.log(`Allowing OOS sale for "${liveProd.name}". Stock will drop into negative values.`);
-                } else {
-                    throw new Error(`Insufficient stock for "${liveProd.name}". Only ${currentStock} units available.`);
-                }
-            }
-        }
 
         const contactPhone = document.getElementById("customer-phone").value.trim();
         const cTitle = document.getElementById("customer-title").value;
         const cFirstName = document.getElementById("customer-first-name").value.trim();
         const cLastName = document.getElementById("customer-last-name").value.trim();
         const selectedOffice = document.getElementById("workplace-select").value;
-        
+
         const paymentMethodSelect = document.getElementById("payment-method-select");
         const paymentMethod = paymentMethodSelect ? paymentMethodSelect.value : "Cash on Delivery";
         const initialPaymentStatus = paymentMethod === 'Cash on Delivery' ? 'Pending Collection' : 'Pending Gateway';
@@ -1332,16 +1302,24 @@ if (effectivePrice < itemCost) {
         const reminderCheckbox = document.getElementById("delivery-reminder-optin");
         const wantsReminder = reminderCheckbox ? reminderCheckbox.checked : false;
 
-        // Upsert Customer Record
-        await db.from('customers').upsert([{
-            phone_number: contactPhone,
-            title: cTitle,
-            first_name: cFirstName,
-            last_name: cLastName,
-            default_office: selectedOffice,
-            wants_delivery_reminder: wantsReminder,
-            last_order_at: new Date().toISOString()
-        }], { onConflict: 'phone_number' });
+        // 1. FINANCE HEAD GUARDRAIL + customer profile save, run concurrently —
+        // neither depends on the other's result, so there's no reason to wait
+        // for one before starting the other.
+        const [guardrailResults] = await Promise.all([
+            Promise.all(items.map(item => checkItemGuardrail(item))),
+            db.from('customers').upsert([{
+                phone_number: contactPhone,
+                title: cTitle,
+                first_name: cFirstName,
+                last_name: cLastName,
+                default_office: selectedOffice,
+                wants_delivery_reminder: wantsReminder,
+                last_order_at: new Date().toISOString()
+            }], { onConflict: 'phone_number' })
+        ]);
+
+        const firstFailure = guardrailResults.find(r => r.error);
+        if (firstFailure) throw new Error(firstFailure.error);
 
         // 2. Insert Order
         const { data: newOrder, error: orderError } = await db.from('orders').insert([{
@@ -1358,45 +1336,18 @@ if (effectivePrice < itemCost) {
         if (orderError) throw new Error("Orders Table Error: " + orderError.message);
         accountOrdersById[newOrder.id] = newOrder; // so cancelOrder() works immediately from the confirmation screen
 
-        // 3. INVENTORY DEDUCTION — a single conditional UPDATE per item instead of a
-        // separate read-then-write. Using .gte('stock_qty', orderQty) makes the write
-        // itself fail (0 rows affected) if stock dropped below what's needed between
-        // our read and write, so two simultaneous checkouts can no longer both pass.
-        // This narrows the race window to one round trip instead of spanning the
-        // whole checkout flow — a Postgres RPC would close it completely, but this
-        // is the strongest guarantee achievable from the client alone.
-        const stockIssues = [];
-        for (const item of items) {
-            const prodId = item.product.id;
-            const orderQty = item.qty;
-            const sellOos = item.product.sell_oos || 'N';
-
-            const { data: currentP } = await db.from('products').select('stock_qty').eq('id', prodId).single();
-            const currentStock = (currentP && currentP.stock_qty) || 0;
-            const updatedStock = currentStock - orderQty; // permits negative when sell_oos = 'Y'
-
-            let updateQuery = db.from('products').update({ stock_qty: updatedStock }).eq('id', prodId);
-            if (sellOos !== 'Y') {
-                updateQuery = updateQuery.gte('stock_qty', orderQty);
-            }
-            const { data: updatedRows, error: updateErr } = await updateQuery.select();
-
-            if (updateErr) {
-                console.error(`Stock update failed for "${item.product.name}":`, updateErr);
-                stockIssues.push(item.product.name);
-            } else if (sellOos !== 'Y' && (!updatedRows || updatedRows.length === 0)) {
-                console.warn(`Stock race lost for "${item.product.name}" on order ${newOrder.id} — flagging for review.`);
-                stockIssues.push(item.product.name);
-            }
-        }
+        // 3. INVENTORY DEDUCTION + combo template save, run concurrently — again,
+        // neither depends on the other. Stock updates across items also now run
+        // in parallel with each other instead of one at a time.
+        const [stockIssues] = await Promise.all([
+            deductStockForItems(items),
+            saveCustomerCustomCombo(contactPhone, items)
+        ]);
+        loadCustomerCustomCombos(contactPhone);
 
         if (stockIssues.length > 0) {
             await db.from('orders').update({ has_stock_issue: true }).eq('id', newOrder.id);
         }
-
-        // Save Custom Combo Template & Reset Cart
-        await saveCustomerCustomCombo(contactPhone, items);
-        loadCustomerCustomCombos(contactPhone);
 
         localStorage.setItem("padesk_phone", contactPhone);
         localStorage.setItem("padesk_title", cTitle);
@@ -1409,6 +1360,8 @@ if (effectivePrice < itemCost) {
         autoPopulateSavedCustomer();
         
         const displayOrderNo = newOrder && newOrder.order_number ? newOrder.order_number : "Successfully";
+
+        if (overlay) overlay.style.display = "none";
 
         // The order is already saved and stock already deducted at this point.
         // Rendering the confirmation view is display-only — its failure must
@@ -1433,10 +1386,71 @@ if (effectivePrice < itemCost) {
         }
 
     } catch (error) {
+        if (overlay) overlay.style.display = "none";
         console.error(error);
         alert("Order Submission Blocked:\n" + error.message);
         updateCartUI();
     }
+}
+
+// Checks one cart item against the pricing and stock guardrails. Returns
+// { error: null } if it's fine to sell, or { error: "..." } with a
+// customer-friendly message if not. Designed to run in parallel across items.
+async function checkItemGuardrail(item) {
+    const prodId = item.product.id;
+    const orderQty = item.qty;
+    const effectivePrice = parseFloat(item.product.deal_price || item.product.price || 0);
+    const itemCost = parseFloat(item.product.cost_price || 0);
+
+    if (effectivePrice < itemCost) {
+        return { error: `We are currently updating pricing for "${item.product.name}". Please remove it from your cart or contact support to proceed.` };
+    }
+
+    const { data: liveProd, error: stockCheckErr } = await db.from('products').select('stock_qty, name, sell_oos').eq('id', prodId).single();
+    if (stockCheckErr || !liveProd) {
+        return { error: `Could not verify stock for ${item.product.name}` };
+    }
+
+    const currentStock = liveProd.stock_qty || 0;
+    const sellOos = liveProd.sell_oos || 'N';
+
+    if (currentStock < orderQty && sellOos !== 'Y') {
+        return { error: `Insufficient stock for "${liveProd.name}". Only ${currentStock} units available.` };
+    }
+
+    return { error: null };
+}
+
+// Deducts stock for every item in parallel using a single conditional UPDATE
+// per item (see comment history below for why .gte() matters here). Returns
+// an array of product names that hit a stock issue, if any.
+async function deductStockForItems(items) {
+    const results = await Promise.all(items.map(async item => {
+        const prodId = item.product.id;
+        const orderQty = item.qty;
+        const sellOos = item.product.sell_oos || 'N';
+
+        const { data: currentP } = await db.from('products').select('stock_qty').eq('id', prodId).single();
+        const currentStock = (currentP && currentP.stock_qty) || 0;
+        const updatedStock = currentStock - orderQty; // permits negative when sell_oos = 'Y'
+
+        let updateQuery = db.from('products').update({ stock_qty: updatedStock }).eq('id', prodId);
+        if (sellOos !== 'Y') {
+            updateQuery = updateQuery.gte('stock_qty', orderQty);
+        }
+        const { data: updatedRows, error: updateErr } = await updateQuery.select();
+
+        if (updateErr) {
+            console.error(`Stock update failed for "${item.product.name}":`, updateErr);
+            return item.product.name;
+        } else if (sellOos !== 'Y' && (!updatedRows || updatedRows.length === 0)) {
+            console.warn(`Stock race lost for "${item.product.name}" — flagging order for review.`);
+            return item.product.name;
+        }
+        return null;
+    }));
+
+    return results.filter(Boolean);
 }
 
 // Computes the next upcoming delivery day (Tuesdays & Thursdays), formatted for display
