@@ -4,6 +4,7 @@ const SUPABASE_ANON_KEY = "sb_publishable_j_MkiOlGUZOBsR8TSxIM1w_pnQ_B1xx";
 const MIN_ITEMS = 3;
 const MIN_TOTAL = 249.00;
 const CART_STORAGE_KEY = "padesk_cart";
+const PRODUCTS_PAGE_SIZE = 30;
 
 let db;
 let allProducts = [];
@@ -13,6 +14,9 @@ let accountOrdersById = {};  // populated when the account drawer's order histor
 let cart = {};
 let currentSlide = 0;
 let slideInterval;
+let currentFilteredProducts = []; // the active filtered/sorted list, for "Load More" paging
+let productsRenderedCount = 0;
+let currentSort = "default";
 
 // Effective selling price for a product (deal price wins if set)
 function getPrice(product) {
@@ -39,6 +43,8 @@ window.onload = function() {
     loadBanners();
     loadProducts();
     autoPopulateSavedCustomer();
+    renderSavedOfficeChips();
+    setupScrollToTopButton();
 };
 
 // Opens/closes the cart drawer. Pass true to force it open (e.g. after adding a combo).
@@ -55,6 +61,72 @@ function toggleCartDrawer(forceOpen) {
 // Kept for any older callers — now opens the cart drawer instead of scrolling
 function scrollToCartSection() {
     toggleCartDrawer(true);
+}
+
+const SAVED_OFFICES_KEY = "padesk_saved_offices";
+
+// Returns the list of offices the customer has starred for quick reuse
+function getSavedOffices() {
+    try {
+        return JSON.parse(localStorage.getItem(SAVED_OFFICES_KEY)) || [];
+    } catch (e) {
+        return [];
+    }
+}
+
+function saveOfficeToQuickList(officeName) {
+    if (!officeName) return;
+    const offices = getSavedOffices();
+    if (!offices.includes(officeName)) {
+        offices.push(officeName);
+        localStorage.setItem(SAVED_OFFICES_KEY, JSON.stringify(offices));
+        renderSavedOfficeChips();
+    }
+}
+
+function removeSavedOffice(officeName) {
+    const offices = getSavedOffices().filter(o => o !== officeName);
+    localStorage.setItem(SAVED_OFFICES_KEY, JSON.stringify(offices));
+    renderSavedOfficeChips();
+}
+
+function selectSavedOffice(officeName) {
+    const select = document.getElementById("workplace-select");
+    if (select) select.value = officeName;
+}
+
+// Renders quick-pick chips for previously saved offices above the delivery point select
+function renderSavedOfficeChips() {
+    const container = document.getElementById("saved-offices-chips");
+    if (!container) return;
+
+    const offices = getSavedOffices();
+    if (offices.length === 0) {
+        container.innerHTML = "";
+        container.style.display = "none";
+        return;
+    }
+
+    container.style.display = "flex";
+    container.innerHTML = offices.map(o => `
+        <span onclick="selectSavedOffice('${o.replace(/'/g, "\\'")}')" style="display: inline-flex; align-items: center; gap: 4px; background: #e6f7f0; color: #088a4f; font-size: 0.72rem; font-weight: 600; padding: 4px 8px; border-radius: 12px; cursor: pointer; white-space: nowrap;">
+            📍 ${o}
+            <span onclick="event.stopPropagation(); removeSavedOffice('${o.replace(/'/g, "\\'")}')" style="color: #a0aec0; font-weight: bold; margin-left: 2px;">✕</span>
+        </span>
+    `).join('');
+}
+
+// Shows a floating "back to top" button once the user has scrolled down a bit
+function setupScrollToTopButton() {
+    const btn = document.getElementById("scroll-top-btn");
+    if (!btn) return;
+    window.addEventListener('scroll', () => {
+        btn.style.display = window.scrollY > 600 ? "flex" : "none";
+    });
+}
+
+function scrollToTop() {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 // 1. AUTO-POPULATE & STATE BAR ENGINE
@@ -352,6 +424,7 @@ async function loadAccountHistory(phone) {
             const total = parseFloat(o.total_amount || 0).toFixed(2);
             
             const color = status === 'Delivered' ? '#0baf65' : (status === 'Cancelled' ? '#e53e3e' : '#3182ce');
+            const isCancellable = status === 'Order Placed';
 
             // Generate items carefully without tables
             let itemsHtml = items.map(item => {
@@ -386,6 +459,7 @@ async function loadAccountHistory(phone) {
                         <div style="font-weight: bold; font-size: 0.75rem; color: #4a5568; margin-bottom: 4px;">📦 Ordered Items:</div>
                         ${itemsHtml}
                         <button type="button" onclick="reorderPastOrder(${o.id})" style="margin-top: 10px; width: 100%; background: #0baf65; color: white; border: none; padding: 8px; border-radius: 6px; font-weight: bold; font-size: 0.78rem; cursor: pointer;">🔁 Reorder These Items</button>
+                        ${isCancellable ? `<button type="button" onclick="cancelOrder(${o.id})" style="margin-top: 8px; width: 100%; background: white; color: #e53e3e; border: 1px solid #e53e3e; padding: 8px; border-radius: 6px; font-weight: bold; font-size: 0.78rem; cursor: pointer;">Cancel Order</button>` : ''}
                     </div>
                 </div>
             `;
@@ -395,6 +469,50 @@ async function loadAccountHistory(phone) {
         historyList.innerHTML = `<div style="color: #e53e3e; padding: 10px; font-size: 0.8rem; background: #fff5f5; border: 1px solid #feb2b2; border-radius: 6px;"><strong>Error loading orders:</strong> ${err.message}</div>`;
     }
 }
+// Cancels an order while it's still in the "Order Placed" window and restores
+// the stock that was deducted at checkout.
+async function cancelOrder(orderId) {
+    const order = accountOrdersById[orderId];
+    if (!order) {
+        alert("Sorry, that order's details are no longer available.");
+        return;
+    }
+
+    const orderLabel = order.order_number || `#ORD-${order.id}`;
+    const confirmed = confirm(`Cancel order ${orderLabel}? This can't be undone, and you'll need to place a new order if you change your mind.`);
+    if (!confirmed) return;
+
+    try {
+        const { error: updateErr } = await db
+            .from('orders')
+            .update({ fulfillment_status: 'Cancelled', status: 'Cancelled' })
+            .eq('id', orderId)
+            .eq('fulfillment_status', 'Order Placed'); // guard against cancelling an order ops has already moved on
+
+        if (updateErr) throw updateErr;
+
+        // Restore stock for each item (best-effort; mirrors the deduction at checkout)
+        const items = order.order_items_json || [];
+        for (const item of items) {
+            const prodId = item.product && item.product.id;
+            if (!prodId) continue;
+            const { data: currentP } = await db.from('products').select('stock_qty').eq('id', prodId).single();
+            const restoredStock = ((currentP && currentP.stock_qty) || 0) + (item.qty || 1);
+            await db.from('products').update({ stock_qty: restoredStock }).eq('id', prodId);
+        }
+
+        alert(`Order ${orderLabel} has been cancelled.`);
+        const phone = localStorage.getItem("padesk_phone");
+        if (phone) loadAccountHistory(phone);
+        loadProducts(); // refresh catalog so restored stock is reflected immediately
+        const confirmationView = document.getElementById("order-confirmation-view");
+        if (confirmationView && confirmationView.style.display !== "none") backToStore();
+    } catch (err) {
+        console.error("Error cancelling order:", err);
+        alert("Sorry, we couldn't cancel this order — it may have already moved into preparation. Please contact support.");
+    }
+}
+
 function openFullOrderHistory() {
     const phone = localStorage.getItem("padesk_phone");
     if (!phone) {
@@ -564,7 +682,7 @@ async function loadProducts() {
 
     refreshCartWithLiveData();
     buildDynamicMasterFilters();
-    renderProducts(allProducts);
+    renderProducts(allProducts, true);
 }
 
 // Cart items are persisted with a snapshot of the product at add-time. Once the
@@ -606,13 +724,17 @@ function loadCartFromStorage() {
 // 9. HIERARCHICAL DRILL-DOWN FILTERS (LOCAL WORKSPACE IMAGES FOR BUSINESS & CATEGORY)
 function buildDynamicMasterFilters() {
     const rawBusinesses = [...new Set(allProducts.map(p => p.business).filter(Boolean))];
-    const businesses = ['ALL', ...rawBusinesses.filter(b => b.toLowerCase() !== 'groceries' || b === 'Grocery')];
+    const businesses = ['ALL', ...rawBusinesses];
 
     const businessCircles = document.getElementById("business-circles");
     
+    // Keyed to match the exact values saved by the admin dashboard's "Business"
+    // dropdown (Groceries, Retail, Electronics, Beauty), with a couple of legacy
+    // aliases kept for any products tagged before this naming was standardized.
     const businessImages = {
+        'Groceries': 'images/business/grocery.png',
         'Grocery': 'images/business/grocery.png',
-        'grocery': 'images/business/grocery.png',
+        'Beauty': 'images/business/beauty.png',
         'Health & Beauty': 'images/business/beauty.png',
         'Stationery': 'images/business/stationery.png',
         'Electronics': 'images/business/electronics.png'
@@ -797,17 +919,59 @@ function applyFilters() {
         );
     }
 
-    renderProducts(filtered);
+    filtered = applySortOrder(filtered);
+    renderProducts(filtered, true);
 }
 
-function renderProducts(products) {
+// Sorts a product list according to the currently selected sort option
+function applySortOrder(products) {
+    const sorted = [...products];
+    switch (currentSort) {
+        case "price-asc":
+            return sorted.sort((a, b) => getPrice(a) - getPrice(b));
+        case "price-desc":
+            return sorted.sort((a, b) => getPrice(b) - getPrice(a));
+        case "in-stock":
+            return sorted.sort((a, b) => {
+                const aOos = (a.stock_qty || 0) <= 0 && (a.sell_oos || 'N') !== 'Y';
+                const bOos = (b.stock_qty || 0) <= 0 && (b.sell_oos || 'N') !== 'Y';
+                return aOos - bOos; // in-stock (false=0) first
+            });
+        case "name-asc":
+            return sorted.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+        default:
+            return sorted;
+    }
+}
+
+// Called when the sort dropdown changes
+function handleSortChange(value) {
+    currentSort = value;
+    applyFilters();
+}
+
+// resetPaging=true starts back at page 1 (used whenever filters/search/sort change).
+// Called with no second argument (e.g. from "Load More"), it appends the next page
+// to whatever's already rendered.
+function renderProducts(products, resetPaging) {
     const container = document.getElementById("product-list");
-    if (products.length === 0) {
+
+    if (resetPaging) {
+        currentFilteredProducts = products;
+        productsRenderedCount = 0;
+        container.innerHTML = "";
+    }
+
+    if (currentFilteredProducts.length === 0) {
         container.innerHTML = "<p><small>No items match your search or filter.</small></p>";
+        removeLoadMoreButton();
         return;
     }
 
-    container.innerHTML = products.map(p => {
+    const nextBatch = currentFilteredProducts.slice(productsRenderedCount, productsRenderedCount + PRODUCTS_PAGE_SIZE);
+    productsRenderedCount += nextBatch.length;
+
+    const batchHtml = nextBatch.map(p => {
         const activePrice = getPrice(p);
         const stockQty = p.stock_qty || 0;
         const sellOos = p.sell_oos || 'N';
@@ -827,13 +991,37 @@ function renderProducts(products) {
                         ${p.deal_price ? `<small style="text-decoration:line-through; color:#a0aec0; font-size:0.75rem;">K${parseFloat(p.price).toFixed(2)}</small>` : ''}
                     </div>
                     ${isOutOfStock 
-                        ? `<button class="btn-add" disabled style="background: #cbd5e0; color: #718096; cursor: not-allowed;">Out of Stock</button>`
+                        ? `<button class="btn-add" onclick="notifyWhenBackInStock(${p.id})" style="background: #edf2f7; color: #4a5568; border: 1px solid #cbd5e0;">🔔 Notify Me</button>`
                         : `<button onclick="addToCartById(${p.id}, event)" class="btn-add">+ Add</button>`
                     }
                 </div>
             </div>
         `;
     }).join('');
+
+    container.insertAdjacentHTML('beforeend', batchHtml);
+    renderLoadMoreButton();
+}
+
+function removeLoadMoreButton() {
+    const existing = document.getElementById("load-more-products-btn");
+    if (existing) existing.remove();
+}
+
+function renderLoadMoreButton() {
+    removeLoadMoreButton();
+    if (productsRenderedCount >= currentFilteredProducts.length) return;
+
+    const remaining = currentFilteredProducts.length - productsRenderedCount;
+    const btn = document.createElement("button");
+    btn.id = "load-more-products-btn";
+    btn.type = "button";
+    btn.className = "btn-load-more";
+    btn.innerText = `Load More (${remaining} more item${remaining === 1 ? '' : 's'})`;
+    btn.onclick = () => renderProducts(currentFilteredProducts, false);
+
+    const container = document.getElementById("product-list");
+    container.insertAdjacentElement('afterend', btn);
 }
 
 // Resolves a product id to its object and delegates to addToCart — avoids ever
@@ -846,6 +1034,32 @@ function addToCartById(productId, event) {
         return;
     }
     addToCart(product, event);
+}
+
+// Captures interest in an out-of-stock product so demand isn't silently lost.
+// Requires a `stock_notifications` table — see the SQL provided alongside this feature.
+async function notifyWhenBackInStock(productId) {
+    const product = getProductById(productId);
+    if (!product) return;
+
+    let phone = localStorage.getItem("padesk_phone") || "";
+    if (!phone) {
+        phone = prompt(`We'll text you when "${product.name}" is back in stock. Enter your phone number:`) || "";
+        phone = phone.trim();
+        if (!phone) return;
+    }
+
+    try {
+        await db.from('stock_notifications').insert([{
+            product_id: productId,
+            phone_number: phone,
+            notified: false
+        }]);
+        alert(`Got it! We'll let you know when "${product.name}" is back in stock.`);
+    } catch (err) {
+        console.error("Could not save stock notification request:", err);
+        alert("Sorry, something went wrong saving your request. Please try again.");
+    }
 }
 
 // 11. QUANTITY BASKET & COMBO ENGINE
@@ -960,6 +1174,49 @@ function updateCartUI() {
             ? `Place Combo Order (K ${totalPrice.toFixed(2)})` 
             : `Build Min Combo (${MIN_ITEMS} Items & K${MIN_TOTAL.toFixed(0)}) to Order`;
     }
+
+    renderComboNudge(hasMinItems, hasMinPrice, totalCount, totalPrice);
+}
+
+// Suggests a couple of cheap, in-stock items not already in the cart when the
+// customer is close to (but hasn't yet met) the combo minimums.
+function renderComboNudge(hasMinItems, hasMinPrice, totalCount, totalPrice) {
+    const nudgeEl = document.getElementById("combo-nudge");
+    if (!nudgeEl) return;
+
+    const isClose = !(hasMinItems && hasMinPrice) &&
+        (totalCount >= MIN_ITEMS - 1 || totalPrice >= MIN_TOTAL * 0.7) &&
+        totalCount > 0;
+
+    if (!isClose) {
+        nudgeEl.style.display = "none";
+        nudgeEl.innerHTML = "";
+        return;
+    }
+
+    const suggestions = allProducts
+        .filter(p => !cart[p.id] && (p.stock_qty || 0) > 0)
+        .sort((a, b) => getPrice(a) - getPrice(b))
+        .slice(0, 3);
+
+    if (suggestions.length === 0) {
+        nudgeEl.style.display = "none";
+        return;
+    }
+
+    nudgeEl.style.display = "block";
+    nudgeEl.innerHTML = `
+        <div style="font-size: 0.78rem; font-weight: 700; color: #4a5568; margin-bottom: 6px;">Almost there! Add one of these to complete your combo:</div>
+        <div style="display: flex; gap: 8px; overflow-x: auto;">
+            ${suggestions.map(p => `
+                <div style="flex: 0 0 auto; background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px; min-width: 110px; text-align: center;">
+                    <div style="font-size: 0.72rem; font-weight: 600; color: #2d3748; margin-bottom: 2px;">${p.name}</div>
+                    <div style="font-size: 0.72rem; color: #0baf65; font-weight: 700; margin-bottom: 6px;">K ${getPrice(p).toFixed(2)}</div>
+                    <button onclick="addToCartById(${p.id}, event)" style="width: 100%; background: #0baf65; color: white; border: none; padding: 4px; border-radius: 4px; font-size: 0.7rem; font-weight: bold; cursor: pointer;">+ Add</button>
+                </div>
+            `).join('')}
+        </div>
+    `;
 }
 
 // 12. CHECKOUT PREVIEW MODAL FLOW
@@ -1072,6 +1329,9 @@ if (effectivePrice < itemCost) {
         const paymentMethod = paymentMethodSelect ? paymentMethodSelect.value : "Cash on Delivery";
         const initialPaymentStatus = paymentMethod === 'Cash on Delivery' ? 'Pending Collection' : 'Pending Gateway';
 
+        const reminderCheckbox = document.getElementById("delivery-reminder-optin");
+        const wantsReminder = reminderCheckbox ? reminderCheckbox.checked : false;
+
         // Upsert Customer Record
         await db.from('customers').upsert([{
             phone_number: contactPhone,
@@ -1079,6 +1339,7 @@ if (effectivePrice < itemCost) {
             first_name: cFirstName,
             last_name: cLastName,
             default_office: selectedOffice,
+            wants_delivery_reminder: wantsReminder,
             last_order_at: new Date().toISOString()
         }], { onConflict: 'phone_number' });
 
@@ -1095,6 +1356,7 @@ if (effectivePrice < itemCost) {
         }]).select().single();
 
         if (orderError) throw new Error("Orders Table Error: " + orderError.message);
+        accountOrdersById[newOrder.id] = newOrder; // so cancelOrder() works immediately from the confirmation screen
 
         // 3. INVENTORY DEDUCTION — a single conditional UPDATE per item instead of a
         // separate read-then-write. Using .gte('stock_qty', orderQty) makes the write
@@ -1129,7 +1391,7 @@ if (effectivePrice < itemCost) {
         }
 
         if (stockIssues.length > 0) {
-            await db.from('orders').update({ fulfillment_status: 'Stock Issue - Review Needed' }).eq('id', newOrder.id);
+            await db.from('orders').update({ has_stock_issue: true }).eq('id', newOrder.id);
         }
 
         // Save Custom Combo Template & Reset Cart
@@ -1153,6 +1415,7 @@ if (effectivePrice < itemCost) {
         // never be reported to the customer as an order/submission failure.
         try {
             showOrderConfirmation({
+                orderId: newOrder ? newOrder.id : null,
                 orderNo: displayOrderNo,
                 title: cTitle,
                 lastName: cLastName,
@@ -1238,6 +1501,16 @@ function showOrderConfirmation(order) {
     }
     viewEl.style.display = "block";
     window.scrollTo(0, 0);
+
+    const cancelBtn = document.getElementById("confirmation-cancel-btn");
+    if (cancelBtn) {
+        if (order.orderId) {
+            cancelBtn.style.display = "inline-block";
+            cancelBtn.onclick = () => cancelOrder(order.orderId);
+        } else {
+            cancelBtn.style.display = "none";
+        }
+    }
 }
 
 // Dismisses the confirmation view and returns to the product grid
