@@ -158,19 +158,27 @@
 
             <div style="background: white; border: 1px solid #e2e8f0; padding: 16px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
                 <label style="display:block; font-weight:800; font-size:0.85rem; margin-bottom:12px; color:#1a202c;">👤 CUSTOMER PROFILE</label>
-                
-                <div style="display: flex; gap: 10px; margin-bottom: 10px;">
-                    <select id="customer-title" required class="form-input" style="width: 35%; padding: 10px;">
-                        <option value="">Title</option>
-                        <option value="Mr.">Mr.</option>
-                        <option value="Mrs.">Mrs.</option>
-                        <option value="Ms.">Ms.</option>
-                        <option value="Dr.">Dr.</option>
-                    </select>
-                    <input type="text" id="customer-first-name" placeholder="First Name" required class="form-input" style="flex: 1; padding: 10px;">
+
+                <div class="name-field-row">
+                    <div class="name-field name-field-title">
+                        <label for="customer-title">Title</label>
+                        <select id="customer-title" required class="form-input">
+                            <option value="">--</option>
+                            <option value="Mr.">Mr.</option>
+                            <option value="Mrs.">Mrs.</option>
+                            <option value="Ms.">Ms.</option>
+                            <option value="Dr.">Dr.</option>
+                        </select>
+                    </div>
+                    <div class="name-field">
+                        <label for="customer-first-name">First Name</label>
+                        <input type="text" id="customer-first-name" placeholder="e.g. Waqar" required class="form-input">
+                    </div>
+                    <div class="name-field">
+                        <label for="customer-last-name">Last Name</label>
+                        <input type="text" id="customer-last-name" placeholder="e.g. Beigh" required class="form-input">
+                    </div>
                 </div>
-                
-                <input type="text" id="customer-last-name" placeholder="Last Name" required class="form-input" style="width: 100%; padding: 10px;">
             </div>
 
             <button type="submit" id="checkout-btn" class="btn-primary" disabled>Build Min Combo (3 Items & K249) to Order</button>
