@@ -187,6 +187,69 @@
         </div>
     </aside>
 
+    <!-- Full-Screen Order Confirmation View -->
+    <div id="order-confirmation-view" class="order-confirmation-view" style="display: none;">
+        <div class="confirmation-scroll">
+            <div class="confirmation-success-icon">✓</div>
+            <h2 class="confirmation-heading">Order Confirmed!</h2>
+            <p id="confirmation-greeting" class="confirmation-greeting"></p>
+
+            <div class="confirmation-order-number">
+                Order <strong id="confirmation-order-no">-</strong>
+            </div>
+
+            <!-- Status Tracker -->
+            <div class="status-tracker" id="confirmation-status-tracker">
+                <div class="status-step active" data-step="placed">
+                    <div class="status-dot"></div>
+                    <span>Order Placed</span>
+                </div>
+                <div class="status-step" data-step="aggregating">
+                    <div class="status-dot"></div>
+                    <span>Aggregating</span>
+                </div>
+                <div class="status-step" data-step="delivery">
+                    <div class="status-dot"></div>
+                    <span>Out for Delivery</span>
+                </div>
+                <div class="status-step" data-step="delivered">
+                    <div class="status-dot"></div>
+                    <span>Delivered</span>
+                </div>
+            </div>
+
+            <!-- Order Summary Card -->
+            <div class="confirmation-card">
+                <h4>Order Summary</h4>
+                <ul id="confirmation-items-list" class="confirmation-items-list"></ul>
+                <div class="confirmation-total-row">
+                    <span>Total</span>
+                    <span id="confirmation-total">K 0.00</span>
+                </div>
+            </div>
+
+            <!-- Delivery Details Card -->
+            <div class="confirmation-card">
+                <h4>Delivery Details</h4>
+                <div class="confirmation-detail-row">
+                    <span>📍 Location</span>
+                    <span id="confirmation-office">-</span>
+                </div>
+                <div class="confirmation-detail-row">
+                    <span>🚛 Expected Delivery</span>
+                    <span id="confirmation-delivery-day">-</span>
+                </div>
+                <div class="confirmation-detail-row">
+                    <span>💳 Payment</span>
+                    <span id="confirmation-payment">-</span>
+                </div>
+            </div>
+
+            <button type="button" class="btn-primary" onclick="backToStore()">← Back to Store</button>
+            <button type="button" class="btn-link-view-history" onclick="backToStore(); openFullOrderHistory();">View in Order History</button>
+        </div>
+    </div>
+
     <script src="app.js"></script>
 </body>
 </html>
