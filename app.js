@@ -1000,7 +1000,7 @@ if (effectivePrice < itemCost) {
             });
         } catch (renderError) {
             console.error("Order succeeded but confirmation view failed to render:", renderError);
-            alert(`Zikomo ${cTitle} ${cLastName || cFirstName}! Order ${displayOrderNo} has been placed. Stock levels have been automatically updated.`);
+            alert(`Zikomo ${cTitle} ${cLastName || cFirstName}! Order ${displayOrderNo} has been placed and is being prepared for delivery.`);
         }
 
     } catch (error) {
@@ -1037,7 +1037,7 @@ function setTextSafe(id, value) {
 
 // Renders the full-screen order confirmation view in place of the alert()
 function showOrderConfirmation(order) {
-    setTextSafe("confirmation-greeting", `Zikomo ${order.title} ${order.lastName || order.firstName}! Your order has been placed and stock levels have been updated.`);
+    setTextSafe("confirmation-greeting", `Zikomo ${order.title} ${order.lastName || order.firstName}! We've received your order and it's being prepared for delivery.`);
     setTextSafe("confirmation-order-no", order.orderNo);
     setTextSafe("confirmation-office", order.office);
     setTextSafe("confirmation-delivery-day", getNextDeliveryDayLabel());
