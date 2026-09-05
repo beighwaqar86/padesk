@@ -982,17 +982,26 @@ if (effectivePrice < itemCost) {
         autoPopulateSavedCustomer();
         
         const displayOrderNo = newOrder && newOrder.order_number ? newOrder.order_number : "Successfully";
-        showOrderConfirmation({
-            orderNo: displayOrderNo,
-            title: cTitle,
-            lastName: cLastName,
-            firstName: cFirstName,
-            office: selectedOffice,
-            paymentMethod: paymentMethod,
-            paymentStatus: initialPaymentStatus,
-            items: items,
-            total: totalPrice
-        });
+
+        // The order is already saved and stock already deducted at this point.
+        // Rendering the confirmation view is display-only — its failure must
+        // never be reported to the customer as an order/submission failure.
+        try {
+            showOrderConfirmation({
+                orderNo: displayOrderNo,
+                title: cTitle,
+                lastName: cLastName,
+                firstName: cFirstName,
+                office: selectedOffice,
+                paymentMethod: paymentMethod,
+                paymentStatus: initialPaymentStatus,
+                items: items,
+                total: totalPrice
+            });
+        } catch (renderError) {
+            console.error("Order succeeded but confirmation view failed to render:", renderError);
+            alert(`Zikomo ${cTitle} ${cLastName || cFirstName}! Order ${displayOrderNo} has been placed. Stock levels have been automatically updated.`);
+        }
 
     } catch (error) {
         console.error(error);
@@ -1016,27 +1025,42 @@ function getNextDeliveryDayLabel() {
     return "Tue or Thu";
 }
 
+// Safely sets text on an element if it exists; no-op (with a console warning) otherwise
+function setTextSafe(id, value) {
+    const el = document.getElementById(id);
+    if (!el) {
+        console.warn(`showOrderConfirmation: element #${id} not found in DOM — is index.html up to date?`);
+        return;
+    }
+    el.innerText = value;
+}
+
 // Renders the full-screen order confirmation view in place of the alert()
 function showOrderConfirmation(order) {
-    document.getElementById("confirmation-greeting").innerText =
-        `Zikomo ${order.title} ${order.lastName || order.firstName}! Your order has been placed and stock levels have been updated.`;
-    document.getElementById("confirmation-order-no").innerText = order.orderNo;
-    document.getElementById("confirmation-office").innerText = order.office;
-    document.getElementById("confirmation-delivery-day").innerText = getNextDeliveryDayLabel();
-    document.getElementById("confirmation-payment").innerText = `${order.paymentMethod} — ${order.paymentStatus}`;
-    document.getElementById("confirmation-total").innerText = `K ${order.total.toFixed(2)}`;
+    setTextSafe("confirmation-greeting", `Zikomo ${order.title} ${order.lastName || order.firstName}! Your order has been placed and stock levels have been updated.`);
+    setTextSafe("confirmation-order-no", order.orderNo);
+    setTextSafe("confirmation-office", order.office);
+    setTextSafe("confirmation-delivery-day", getNextDeliveryDayLabel());
+    setTextSafe("confirmation-payment", `${order.paymentMethod} — ${order.paymentStatus}`);
+    setTextSafe("confirmation-total", `K ${order.total.toFixed(2)}`);
 
     const escapeHtml = (str) => String(str).replace(/[&<>"']/g, (c) => ({
         "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
     }[c]));
 
     const itemsList = document.getElementById("confirmation-items-list");
-    itemsList.innerHTML = order.items.map(item => {
-        const price = parseFloat(item.product.deal_price || item.product.price || 0);
-        return `<li><span>${escapeHtml(item.product.name)} x${item.qty}</span><span>K ${(price * item.qty).toFixed(2)}</span></li>`;
-    }).join("");
+    if (itemsList) {
+        itemsList.innerHTML = order.items.map(item => {
+            const price = parseFloat(item.product.deal_price || item.product.price || 0);
+            return `<li><span>${escapeHtml(item.product.name)} x${item.qty}</span><span>K ${(price * item.qty).toFixed(2)}</span></li>`;
+        }).join("");
+    }
 
-    document.getElementById("order-confirmation-view").style.display = "block";
+    const viewEl = document.getElementById("order-confirmation-view");
+    if (!viewEl) {
+        throw new Error("Confirmation view container (#order-confirmation-view) not found — falling back to alert.");
+    }
+    viewEl.style.display = "block";
     window.scrollTo(0, 0);
 }
 
