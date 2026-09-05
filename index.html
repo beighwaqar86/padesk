@@ -44,7 +44,7 @@
         <div class="circle-shortcuts-container sub-circles" id="subcategory-circles" style="display: none;"></div>
     </div>
 
-    <!-- Search Bar & Cart Quick-Jump Graphic Button -->
+    <!-- Search Bar, Sort, & Cart Quick-Jump Graphic Button -->
     <div class="search-filter-bar">
         <input 
             type="text" 
@@ -57,11 +57,25 @@
         </button>
     </div>
 
+    <div class="sort-bar">
+        <label for="sort-select">Sort:</label>
+        <select id="sort-select" class="form-input" onchange="handleSortChange(this.value)">
+            <option value="default">Default</option>
+            <option value="price-asc">Price: Low to High</option>
+            <option value="price-desc">Price: High to Low</option>
+            <option value="in-stock">In Stock First</option>
+            <option value="name-asc">Name: A-Z</option>
+        </select>
+    </div>
+
     <!-- Floating Cart Button (always reachable, no matter how far you've scrolled) -->
     <button type="button" id="floating-cart-btn" class="floating-cart-btn" onclick="toggleCartDrawer()">
         🛒
         <span id="floating-cart-count" class="floating-cart-badge">0</span>
     </button>
+
+    <!-- Jump back to the top of a long product catalog -->
+    <button type="button" id="scroll-top-btn" class="scroll-top-btn" onclick="scrollToTop()" style="display: none;">↑</button>
 
     <!-- Product Grid -->
     <main class="content-container">
@@ -97,16 +111,22 @@
             <div id="price-rule" class="rule-badge">❌ Total: K 0.00 / K 249.00 min</div>
         </div>
 
+        <div id="combo-nudge" style="display: none; background: #f7fafc; border-radius: 10px; padding: 10px; margin-bottom: 12px;"></div>
+
         <form id="checkout-form" onsubmit="handleCheckout(event)">
             
             <div style="margin-bottom: 16px;">
                 <label for="workplace-select" style="display:block; font-weight:700; font-size:0.8rem; margin-bottom:6px; color:#4a5568;">📍 Delivery Point</label>
-                <select id="workplace-select" required class="form-input">
-                    <option value="">-- Choose your office --</option>
-                    <option value="New Government Complex">New Government Complex (Independence Ave)</option>
-                    <option value="Ministry of Finance">Ministry of Finance (Haile Selassie Ave)</option>
-                    <option value="Zanaco HQ">Zanaco HQ (Cairo Road)</option>
-                </select>
+                <div id="saved-offices-chips" style="display: none; flex-wrap: wrap; gap: 6px; margin-bottom: 8px;"></div>
+                <div style="display: flex; gap: 8px;">
+                    <select id="workplace-select" required class="form-input" style="flex: 1;">
+                        <option value="">-- Choose your office --</option>
+                        <option value="New Government Complex">New Government Complex (Independence Ave)</option>
+                        <option value="Ministry of Finance">Ministry of Finance (Haile Selassie Ave)</option>
+                        <option value="Zanaco HQ">Zanaco HQ (Cairo Road)</option>
+                    </select>
+                    <button type="button" onclick="saveOfficeToQuickList(document.getElementById('workplace-select').value)" title="Save this office for quick reuse" style="background: #edf2f7; border: 1px solid #cbd5e0; border-radius: 6px; padding: 0 10px; cursor: pointer; font-size: 0.9rem;">☆</button>
+                </div>
             </div>
 
             <div style="margin-bottom: 16px;">
@@ -118,6 +138,11 @@
                     <option value="Cash on Delivery">Cash on Delivery (CoD)</option>
                 </select>
             </div>
+
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 0.8rem; color: #4a5568; margin-bottom: 16px; cursor: pointer;">
+                <input type="checkbox" id="delivery-reminder-optin">
+                🔔 Remind me before the next delivery cutoff
+            </label>
 
             <div style="margin-bottom: 16px;">
                 <label for="customer-phone" style="display:block; font-weight:700; font-size:0.8rem; margin-bottom:6px; color:#4a5568;">📱 WhatsApp Number</label>
