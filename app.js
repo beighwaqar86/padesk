@@ -1,14 +1,41 @@
 const SUPABASE_URL = "https://cziefuaclocpwicwjprb.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_j_MkiOlGUZOBsR8TSxIM1w_pnQ_B1xx";
 
+const MIN_ITEMS = 3;
+const MIN_TOTAL = 249.00;
+const CART_STORAGE_KEY = "padesk_cart";
+
 let db;
 let allProducts = [];
+let productsById = {};       // live catalog, keyed by id — always the freshest price/stock
+let historicalProductsById = {}; // fallback snapshots from past orders, for products no longer active
+let accountOrdersById = {};  // populated when the account drawer's order history loads
 let cart = {};
 let currentSlide = 0;
 let slideInterval;
 
+// Effective selling price for a product (deal price wins if set)
+function getPrice(product) {
+    return parseFloat(product.deal_price || product.price || 0);
+}
+
+// Aggregate count + total for a set of cart items ({ product, qty })
+function getCartTotals(items) {
+    return items.reduce((acc, item) => {
+        acc.count += item.qty;
+        acc.total += getPrice(item.product) * item.qty;
+        return acc;
+    }, { count: 0, total: 0 });
+}
+
+// Looks up a product by id, preferring the live catalog over a historical snapshot
+function getProductById(id) {
+    return productsById[id] || historicalProductsById[id] || null;
+}
+
 window.onload = function() {
     db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    loadCartFromStorage();
     loadBanners();
     loadProducts();
     autoPopulateSavedCustomer();
@@ -168,6 +195,7 @@ async function loadPastPurchases(phone) {
         items.forEach(item => {
             const p = item.product;
             if (p && !pastItemsMap[p.id]) pastItemsMap[p.id] = p;
+            if (p && !historicalProductsById[p.id]) historicalProductsById[p.id] = p;
         });
     });
 
@@ -182,9 +210,9 @@ async function loadPastPurchases(phone) {
                 <div>
                     <span class="brand-tag">${p.brand || 'General'}</span>
                     <h5>${p.name}</h5>
-                    <div class="price" style="font-size:0.8rem; margin:2px 0;">K ${parseFloat(p.deal_price || p.price).toFixed(2)}</div>
+                    <div class="price" style="font-size:0.8rem; margin:2px 0;">K ${getPrice(p).toFixed(2)}</div>
                 </div>
-                <button onclick='addToCart(${JSON.stringify(p)}, event)' class="btn-add" style="padding:4px 8px; font-size:0.75rem;">+ Add to Combo</button>
+                <button onclick="addToCartById(${p.id}, event)" class="btn-add" style="padding:4px 8px; font-size:0.75rem;">+ Add to Combo</button>
             </div>
         `).join('');
     }
@@ -308,6 +336,7 @@ async function loadAccountHistory(phone) {
         }
 
         historyList.innerHTML = orders.map(o => {
+            accountOrdersById[o.id] = o;
             const orderDate = o.created_at ? new Date(o.created_at).toLocaleDateString() : '-';
             const orderNum = o.order_number || (`#ORD-${o.id}`);
             const status = o.fulfillment_status || 'Order Placed';
@@ -319,7 +348,7 @@ async function loadAccountHistory(phone) {
             // Generate items carefully without tables
             let itemsHtml = items.map(item => {
                 const pName = (item.product && item.product.name) ? item.product.name : 'Item';
-                const pPrice = item.product ? parseFloat(item.product.deal_price || item.product.price || 0) : 0;
+                const pPrice = item.product ? getPrice(item.product) : 0;
                 return `
                     <div style="display: flex; justify-content: space-between; font-size: 0.75rem; border-bottom: 1px solid #edf2f7; padding: 6px 0; color: #2d3748;">
                         <span>${item.qty || 1}x ${pName}</span>
@@ -348,6 +377,7 @@ async function loadAccountHistory(phone) {
                         </div>
                         <div style="font-weight: bold; font-size: 0.75rem; color: #4a5568; margin-bottom: 4px;">📦 Ordered Items:</div>
                         ${itemsHtml}
+                        <button type="button" onclick="reorderPastOrder(${o.id})" style="margin-top: 10px; width: 100%; background: #0baf65; color: white; border: none; padding: 8px; border-radius: 6px; font-weight: bold; font-size: 0.78rem; cursor: pointer;">🔁 Reorder These Items</button>
                     </div>
                 </div>
             `;
@@ -365,6 +395,50 @@ function openFullOrderHistory() {
     }
     window.location.href = "my-orders.html";
 }
+// Re-adds every item from a past order to the current cart, preferring live
+// product data (current price/stock) over the snapshot stored on the order.
+function reorderPastOrder(orderId) {
+    const order = accountOrdersById[orderId];
+    if (!order) {
+        alert("Sorry, that order's details are no longer available.");
+        return;
+    }
+
+    const items = order.order_items_json || [];
+    let addedCount = 0;
+    let skipped = [];
+
+    items.forEach(item => {
+        const snapshotProduct = item.product;
+        if (!snapshotProduct || !snapshotProduct.id) return;
+
+        const liveProduct = getProductById(snapshotProduct.id) || snapshotProduct;
+        const stockQty = liveProduct.stock_qty || 0;
+        const sellOos = liveProduct.sell_oos || 'N';
+
+        if (stockQty <= 0 && sellOos !== 'Y') {
+            skipped.push(liveProduct.name);
+            return;
+        }
+
+        if (cart[liveProduct.id]) {
+            cart[liveProduct.id].qty += (item.qty || 1);
+        } else {
+            cart[liveProduct.id] = { product: liveProduct, qty: item.qty || 1 };
+        }
+        addedCount++;
+    });
+
+    updateCartUI();
+    toggleAccountDrawer();
+    scrollToCartSection();
+
+    const orderLabel = order.order_number || `#ORD-${order.id}`;
+    let msg = `Added ${addedCount} item(s) from order ${orderLabel} to your cart.`;
+    if (skipped.length > 0) msg += ` Currently unavailable and skipped: ${skipped.join(", ")}.`;
+    alert(msg);
+}
+
 // 7. READY-MADE ADMIN COMBO BANNERS SLIDER
 async function loadBanners() {
     const { data: banners } = await db.from('banners').select('*').eq('is_active', true);
@@ -477,8 +551,48 @@ async function loadProducts() {
     }
 
     allProducts = products;
+    productsById = {};
+    allProducts.forEach(p => { productsById[p.id] = p; });
+
+    refreshCartWithLiveData();
     buildDynamicMasterFilters();
     renderProducts(allProducts);
+}
+
+// Cart items are persisted with a snapshot of the product at add-time. Once the
+// live catalog has loaded, swap in the current product data (price/stock/deal)
+// wherever available so a restored cart never shows stale prices.
+function refreshCartWithLiveData() {
+    let changed = false;
+    Object.keys(cart).forEach(id => {
+        const live = productsById[id];
+        if (live) {
+            cart[id].product = live;
+            changed = true;
+        }
+    });
+    if (changed) updateCartUI();
+}
+
+// Persists the cart so a page refresh or accidental close doesn't lose it
+function saveCartToStorage() {
+    try {
+        localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
+    } catch (e) {
+        console.warn("Could not persist cart:", e);
+    }
+}
+
+// Restores a previously saved cart on load (called before products finish loading;
+// refreshCartWithLiveData() then swaps in live product data once available)
+function loadCartFromStorage() {
+    try {
+        const saved = localStorage.getItem(CART_STORAGE_KEY);
+        if (saved) cart = JSON.parse(saved) || {};
+    } catch (e) {
+        console.warn("Could not restore saved cart:", e);
+        cart = {};
+    }
 }
 
 // 9. HIERARCHICAL DRILL-DOWN FILTERS (LOCAL WORKSPACE IMAGES FOR BUSINESS & CATEGORY)
@@ -686,7 +800,7 @@ function renderProducts(products) {
     }
 
     container.innerHTML = products.map(p => {
-        const activePrice = p.deal_price ? p.deal_price : p.price;
+        const activePrice = getPrice(p);
         const stockQty = p.stock_qty || 0;
         const sellOos = p.sell_oos || 'N';
         const isOutOfStock = stockQty <= 0 && sellOos !== 'Y';
@@ -701,17 +815,29 @@ function renderProducts(products) {
                 </div>
                 <div>
                     <div class="price">
-                        K ${parseFloat(activePrice).toFixed(2)}
+                        K ${activePrice.toFixed(2)}
                         ${p.deal_price ? `<small style="text-decoration:line-through; color:#a0aec0; font-size:0.75rem;">K${parseFloat(p.price).toFixed(2)}</small>` : ''}
                     </div>
                     ${isOutOfStock 
                         ? `<button class="btn-add" disabled style="background: #cbd5e0; color: #718096; cursor: not-allowed;">Out of Stock</button>`
-                        : `<button onclick='addToCart(${JSON.stringify(p)}, event)' class="btn-add">+ Add</button>`
+                        : `<button onclick="addToCartById(${p.id}, event)" class="btn-add">+ Add</button>`
                     }
                 </div>
             </div>
         `;
     }).join('');
+}
+
+// Resolves a product id to its object and delegates to addToCart — avoids ever
+// embedding a full product object (with possibly unescaped quotes) into an
+// onclick attribute string.
+function addToCartById(productId, event) {
+    const product = getProductById(productId);
+    if (!product) {
+        alert("Sorry, this item is no longer available.");
+        return;
+    }
+    addToCart(product, event);
 }
 
 // 11. QUANTITY BASKET & COMBO ENGINE
@@ -761,32 +887,35 @@ function updateQuantity(productId, change) {
     updateCartUI();
 }
 
+function removeFromCart(productId) {
+    delete cart[productId];
+    updateCartUI();
+}
+
 function updateCartUI() {
     const list = document.getElementById("cart-items");
     const items = Object.values(cart);
 
     list.innerHTML = items.map(item => {
-        const effectivePrice = item.product.deal_price ? item.product.deal_price : item.product.price;
+        const effectivePrice = getPrice(item.product);
         return `
             <li style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 0.85rem;">
                 <div>
                     <strong>${item.product.name}</strong><br>
-                    <small>K ${parseFloat(effectivePrice).toFixed(2)} x ${item.qty} = <strong>K ${(parseFloat(effectivePrice) * item.qty).toFixed(2)}</strong></small>
+                    <small>K ${effectivePrice.toFixed(2)} x ${item.qty} = <strong>K ${(effectivePrice * item.qty).toFixed(2)}</strong></small>
                 </div>
                 <div style="display: flex; align-items: center; gap: 6px;">
                     <button onclick="updateQuantity(${item.product.id}, -1)" style="background: #edf2f7; border: 1px solid #cbd5e0; border-radius: 4px; padding: 2px 8px; font-weight: bold; cursor: pointer;">-</button>
                     <span style="font-weight: bold;">${item.qty}</span>
                     <button onclick="updateQuantity(${item.product.id}, 1)" style="background: #0baf65; color: white; border: none; border-radius: 4px; padding: 2px 8px; font-weight: bold; cursor: pointer;">+</button>
+                    <button onclick="removeFromCart(${item.product.id})" title="Remove item" style="background: none; border: none; color: #e53e3e; font-weight: bold; font-size: 1rem; cursor: pointer; padding: 2px 4px;">✕</button>
                 </div>
             </li>
         `;
     }).join('');
 
-    const totalCount = items.reduce((sum, item) => sum + item.qty, 0);
-    const totalPrice = items.reduce((sum, item) => {
-        const p = item.product.deal_price ? item.product.deal_price : item.product.price;
-        return sum + (parseFloat(p) * item.qty);
-    }, 0);
+    const { count: totalCount, total: totalPrice } = getCartTotals(items);
+    saveCartToStorage();
 
     const headerCartCountEl = document.getElementById("header-cart-count");
     if (headerCartCountEl) {
@@ -797,16 +926,16 @@ function updateCartUI() {
     const priceRuleEl = document.getElementById("price-rule");
     const checkoutBtn = document.getElementById("checkout-btn");
 
-    const hasMinItems = totalCount >= 3;
-    const hasMinPrice = totalPrice >= 249.00;
+    const hasMinItems = totalCount >= MIN_ITEMS;
+    const hasMinPrice = totalPrice >= MIN_TOTAL;
 
     if (countRuleEl) {
-        countRuleEl.innerHTML = hasMinItems ? `✅ Total Items: ${totalCount} (Minimum Met)` : `❌ Total Items: ${totalCount} / 3 min`;
+        countRuleEl.innerHTML = hasMinItems ? `✅ Total Items: ${totalCount} (Minimum Met)` : `❌ Total Items: ${totalCount} / ${MIN_ITEMS} min`;
         countRuleEl.style.color = hasMinItems ? "#088a4f" : "#e53e3e";
     }
 
     if (priceRuleEl) {
-        priceRuleEl.innerHTML = hasMinPrice ? `✅ Total: K ${totalPrice.toFixed(2)} (Minimum Met)` : `❌ Total: K ${totalPrice.toFixed(2)} / K 249.00 min`;
+        priceRuleEl.innerHTML = hasMinPrice ? `✅ Total: K ${totalPrice.toFixed(2)} (Minimum Met)` : `❌ Total: K ${totalPrice.toFixed(2)} / K ${MIN_TOTAL.toFixed(2)} min`;
         priceRuleEl.style.color = hasMinPrice ? "#088a4f" : "#e53e3e";
     }
 
@@ -814,7 +943,7 @@ function updateCartUI() {
         checkoutBtn.disabled = !(hasMinItems && hasMinPrice);
         checkoutBtn.innerText = (hasMinItems && hasMinPrice) 
             ? `Place Combo Order (K ${totalPrice.toFixed(2)})` 
-            : "Build Min Combo (3 Items & K249) to Order";
+            : `Build Min Combo (${MIN_ITEMS} Items & K${MIN_TOTAL.toFixed(0)}) to Order`;
     }
 }
 
@@ -823,13 +952,9 @@ function handleCheckout(event) {
     event.preventDefault();
 
     const items = Object.values(cart);
-    const totalCount = items.reduce((sum, item) => sum + item.qty, 0);
-    const totalPrice = items.reduce((sum, item) => {
-        const p = item.product.deal_price ? item.product.deal_price : item.product.price;
-        return sum + (parseFloat(p) * item.qty);
-    }, 0);
+    const { count: totalCount, total: totalPrice } = getCartTotals(items);
 
-    if (totalCount < 3 || totalPrice < 249.00) {
+    if (totalCount < MIN_ITEMS || totalPrice < MIN_TOTAL) {
         updateCartUI();
         return alert("Combo criteria not met!");
     }
@@ -855,17 +980,20 @@ function handleCheckout(event) {
     `;
 
     document.getElementById("preview-items-list").innerHTML = items.map(item => {
-        const effectivePrice = item.product.deal_price ? item.product.deal_price : item.product.price;
+        const effectivePrice = getPrice(item.product);
         return `
             <div style="display: flex; justify-content: space-between; font-size: 0.82rem; margin-bottom: 6px;">
                 <span>${item.qty}x ${item.product.name}</span>
-                <strong>K ${(parseFloat(effectivePrice) * item.qty).toFixed(2)}</strong>
+                <strong>K ${(effectivePrice * item.qty).toFixed(2)}</strong>
             </div>
         `;
     }).join('');
 
     document.getElementById("preview-payment-method").innerText = paymentMethod;
     document.getElementById("preview-total-amount").innerText = `K ${totalPrice.toFixed(2)}`;
+
+    const deliveryDayEl = document.getElementById("preview-delivery-day");
+    if (deliveryDayEl) deliveryDayEl.innerText = getNextDeliveryDayLabel();
 
     document.getElementById("order-preview-modal").style.display = "flex";
     document.getElementById("order-preview-overlay").style.display = "block";
@@ -887,10 +1015,7 @@ async function executeFinalOrderSubmission() {
         }
 
         const items = Object.values(cart);
-        const totalPrice = items.reduce((sum, item) => {
-            const p = item.product.deal_price ? item.product.deal_price : item.product.price;
-            return sum + (parseFloat(p) * item.qty);
-        }, 0);
+        const { total: totalPrice } = getCartTotals(items);
 
         // 1. FINANCE HEAD GUARDRAIL: Check Selling Price vs Cost Price & Stock Availability (with sell_oos check)
         for (const item of items) {
@@ -955,16 +1080,40 @@ if (effectivePrice < itemCost) {
 
         if (orderError) throw new Error("Orders Table Error: " + orderError.message);
 
-        // 3. AUTOMATED INVENTORY DEDUCTION (Deduct stock, allowing negative stock if sell_oos is 'Y')
+        // 3. INVENTORY DEDUCTION — a single conditional UPDATE per item instead of a
+        // separate read-then-write. Using .gte('stock_qty', orderQty) makes the write
+        // itself fail (0 rows affected) if stock dropped below what's needed between
+        // our read and write, so two simultaneous checkouts can no longer both pass.
+        // This narrows the race window to one round trip instead of spanning the
+        // whole checkout flow — a Postgres RPC would close it completely, but this
+        // is the strongest guarantee achievable from the client alone.
+        const stockIssues = [];
         for (const item of items) {
             const prodId = item.product.id;
             const orderQty = item.qty;
+            const sellOos = item.product.sell_oos || 'N';
 
-            // Fetch latest stock to prevent race conditions
             const { data: currentP } = await db.from('products').select('stock_qty').eq('id', prodId).single();
-            const updatedStock = (currentP.stock_qty || 0) - orderQty; // Permits negative values
+            const currentStock = (currentP && currentP.stock_qty) || 0;
+            const updatedStock = currentStock - orderQty; // permits negative when sell_oos = 'Y'
 
-            await db.from('products').update({ stock_qty: updatedStock }).eq('id', prodId);
+            let updateQuery = db.from('products').update({ stock_qty: updatedStock }).eq('id', prodId);
+            if (sellOos !== 'Y') {
+                updateQuery = updateQuery.gte('stock_qty', orderQty);
+            }
+            const { data: updatedRows, error: updateErr } = await updateQuery.select();
+
+            if (updateErr) {
+                console.error(`Stock update failed for "${item.product.name}":`, updateErr);
+                stockIssues.push(item.product.name);
+            } else if (sellOos !== 'Y' && (!updatedRows || updatedRows.length === 0)) {
+                console.warn(`Stock race lost for "${item.product.name}" on order ${newOrder.id} — flagging for review.`);
+                stockIssues.push(item.product.name);
+            }
+        }
+
+        if (stockIssues.length > 0) {
+            await db.from('orders').update({ fulfillment_status: 'Stock Issue - Review Needed' }).eq('id', newOrder.id);
         }
 
         // Save Custom Combo Template & Reset Cart
@@ -996,7 +1145,8 @@ if (effectivePrice < itemCost) {
                 paymentMethod: paymentMethod,
                 paymentStatus: initialPaymentStatus,
                 items: items,
-                total: totalPrice
+                total: totalPrice,
+                stockIssues: stockIssues
             });
         } catch (renderError) {
             console.error("Order succeeded but confirmation view failed to render:", renderError);
@@ -1043,6 +1193,16 @@ function showOrderConfirmation(order) {
     setTextSafe("confirmation-delivery-day", getNextDeliveryDayLabel());
     setTextSafe("confirmation-payment", `${order.paymentMethod} — ${order.paymentStatus}`);
     setTextSafe("confirmation-total", `K ${order.total.toFixed(2)}`);
+
+    const warningEl = document.getElementById("confirmation-stock-warning");
+    if (warningEl) {
+        if (order.stockIssues && order.stockIssues.length > 0) {
+            warningEl.style.display = "block";
+            warningEl.innerText = `⚠️ Limited availability on: ${order.stockIssues.join(", ")}. Our team will contact you if any substitution is needed.`;
+        } else {
+            warningEl.style.display = "none";
+        }
+    }
 
     const escapeHtml = (str) => String(str).replace(/[&<>"']/g, (c) => ({
         "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
