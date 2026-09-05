@@ -44,28 +44,27 @@
         <div class="circle-shortcuts-container sub-circles" id="subcategory-circles" style="display: none;"></div>
     </div>
 
-    <!-- Search Bar, Sort, & Cart Quick-Jump Graphic Button -->
+    <!-- Search Bar, Sort, & Cart Quick-Jump -->
     <div class="search-filter-bar">
-        <input 
-            type="text" 
-            id="search-input" 
-            placeholder="🔍 Search name, code, category, brand..." 
-            oninput="applyFilters()"
-        >
-        <button type="button" class="btn-filter-toggle" onclick="toggleCartDrawer()" style="background: #0baf65; color: white; display: flex; align-items: center; gap: 6px; border: none; cursor: pointer; padding: 10px 14px; border-radius: 8px; font-weight: bold;">
-            🛒 <span id="header-cart-count">0</span> items
-        </button>
-    </div>
-
-    <div class="sort-bar">
-        <label for="sort-select">Sort:</label>
-        <select id="sort-select" class="form-input" onchange="handleSortChange(this.value)">
-            <option value="default">Default</option>
+        <div class="search-input-wrap">
+            <span class="search-icon">🔍</span>
+            <input 
+                type="text" 
+                id="search-input" 
+                placeholder="Search name, code, category, brand..." 
+                oninput="applyFilters()"
+            >
+        </div>
+        <select id="sort-select" class="sort-select-compact" onchange="handleSortChange(this.value)">
+            <option value="default">Sort: Default</option>
             <option value="price-asc">Price: Low to High</option>
             <option value="price-desc">Price: High to Low</option>
             <option value="in-stock">In Stock First</option>
             <option value="name-asc">Name: A-Z</option>
         </select>
+        <button type="button" class="btn-cart-toggle" onclick="toggleCartDrawer()">
+            🛒<span id="header-cart-count" class="header-cart-badge">0</span>
+        </button>
     </div>
 
     <!-- Floating Cart Button (always reachable, no matter how far you've scrolled) -->
