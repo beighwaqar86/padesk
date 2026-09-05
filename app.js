@@ -982,13 +982,68 @@ if (effectivePrice < itemCost) {
         autoPopulateSavedCustomer();
         
         const displayOrderNo = newOrder && newOrder.order_number ? newOrder.order_number : "Successfully";
-        alert(`Zikomo ${cTitle} ${cLastName || cFirstName}! Order ${displayOrderNo} has been placed. Stock levels have been automatically updated.`);
+        showOrderConfirmation({
+            orderNo: displayOrderNo,
+            title: cTitle,
+            lastName: cLastName,
+            firstName: cFirstName,
+            office: selectedOffice,
+            paymentMethod: paymentMethod,
+            paymentStatus: initialPaymentStatus,
+            items: items,
+            total: totalPrice
+        });
 
     } catch (error) {
         console.error(error);
         alert("Order Submission Blocked:\n" + error.message);
         updateCartUI();
     }
+}
+
+// Computes the next upcoming delivery day (Tuesdays & Thursdays), formatted for display
+function getNextDeliveryDayLabel() {
+    const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const today = new Date();
+    for (let offset = 0; offset <= 7; offset++) {
+        const d = new Date(today);
+        d.setDate(today.getDate() + offset);
+        if (d.getDay() === 2 || d.getDay() === 4) { // Tue=2, Thu=4
+            const label = offset === 0 ? "Today" : offset === 1 ? "Tomorrow" : `${dayNames[d.getDay()]}, ${d.getDate()}/${d.getMonth() + 1}`;
+            return label;
+        }
+    }
+    return "Tue or Thu";
+}
+
+// Renders the full-screen order confirmation view in place of the alert()
+function showOrderConfirmation(order) {
+    document.getElementById("confirmation-greeting").innerText =
+        `Zikomo ${order.title} ${order.lastName || order.firstName}! Your order has been placed and stock levels have been updated.`;
+    document.getElementById("confirmation-order-no").innerText = order.orderNo;
+    document.getElementById("confirmation-office").innerText = order.office;
+    document.getElementById("confirmation-delivery-day").innerText = getNextDeliveryDayLabel();
+    document.getElementById("confirmation-payment").innerText = `${order.paymentMethod} — ${order.paymentStatus}`;
+    document.getElementById("confirmation-total").innerText = `K ${order.total.toFixed(2)}`;
+
+    const escapeHtml = (str) => String(str).replace(/[&<>"']/g, (c) => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    }[c]));
+
+    const itemsList = document.getElementById("confirmation-items-list");
+    itemsList.innerHTML = order.items.map(item => {
+        const price = parseFloat(item.product.deal_price || item.product.price || 0);
+        return `<li><span>${escapeHtml(item.product.name)} x${item.qty}</span><span>K ${(price * item.qty).toFixed(2)}</span></li>`;
+    }).join("");
+
+    document.getElementById("order-confirmation-view").style.display = "block";
+    window.scrollTo(0, 0);
+}
+
+// Dismisses the confirmation view and returns to the product grid
+function backToStore() {
+    document.getElementById("order-confirmation-view").style.display = "none";
+    window.scrollTo(0, 0);
 }
 
 // 13. SMART CUSTOM COMBO SAVER WITH DUPLICATE PREVENTION
