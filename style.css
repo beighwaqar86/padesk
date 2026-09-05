@@ -414,14 +414,81 @@ body {
 
 .past-card h5 { margin: 4px 0; font-size: 0.8rem; }
 
-/* Cart Sheet */
-.cart-card {
+/* Cart Drawer (bottom sheet) */
+.cart-drawer {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: -100%;
+    max-height: 85vh;
     background: white;
-    margin: 16px;
-    padding: 16px;
-    border-radius: 16px;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+    border-radius: 20px 20px 0 0;
+    box-shadow: 0 -8px 24px rgba(0,0,0,0.15);
+    z-index: 220;
+    display: flex;
+    flex-direction: column;
+    transition: bottom 0.3s ease;
 }
+.cart-drawer.open { bottom: 0; }
+
+.cart-drawer-handle {
+    width: 40px;
+    height: 4px;
+    background: #e2e8f0;
+    border-radius: 4px;
+    margin: 10px auto 0;
+}
+
+.cart-drawer .sidebar-header { padding: 10px 16px 12px; }
+.cart-drawer .sidebar-header h3 { font-size: 1rem; }
+
+.cart-drawer-scroll {
+    padding: 0 16px 20px;
+    overflow-y: auto;
+}
+
+/* Floating Cart Button */
+.floating-cart-btn {
+    position: fixed;
+    bottom: 20px;
+    right: 16px;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: var(--primary);
+    color: white;
+    border: none;
+    font-size: 1.4rem;
+    box-shadow: 0 4px 14px rgba(11, 175, 101, 0.4);
+    cursor: pointer;
+    z-index: 150;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.floating-cart-badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    background: #e53e3e;
+    color: white;
+    font-size: 0.7rem;
+    font-weight: 800;
+    min-width: 20px;
+    height: 20px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 4px;
+    box-shadow: 0 0 0 2px white;
+}
+
+.floating-cart-btn.pulse {
+    animation: pulseCart 0.3s ease;
+}
+
 .combo-tracker { display: flex; flex-direction: column; gap: 6px; margin: 12px 0; }
 .rule-badge { font-size: 0.8rem; font-weight: 700; padding: 6px 10px; border-radius: 6px; background: #f7fafc; }
 .btn-primary {
@@ -447,10 +514,6 @@ body {
     0% { transform: scale(1); }
     50% { transform: scale(1.05); }
     100% { transform: scale(1); }
-}
-
-.cart-card.pulse {
-    animation: pulseCart 0.3s ease;
 }
 .btn-danger {
     background: #e53e3e;
