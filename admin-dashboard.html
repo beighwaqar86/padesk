@@ -26,6 +26,7 @@
             <button type="button" onclick="switchAdminTab('pnl')" id="tab-btn-pnl" style="background: #edf2f7; color: #4a5568; border: none; padding: 10px 16px; border-radius: 8px; font-weight: bold; cursor: pointer;">💰 P&L Report</button>
             <button type="button" onclick="switchAdminTab('banners')" id="tab-btn-banners" style="background: #edf2f7; color: #4a5568; border: none; padding: 10px 16px; border-radius: 8px; font-weight: bold; cursor: pointer;">⚡ Ready-Made Combos</button>
             <button type="button" onclick="switchAdminTab('fulfillment')" id="tab-btn-fulfillment" style="background: #edf2f7; color: #4a5568; border: none; padding: 10px 16px; border-radius: 8px; font-weight: bold; cursor: pointer;">🚚 Order Fulfillment</button>
+            <button type="button" onclick="switchAdminTab('notifications')" id="tab-btn-notifications" style="background: #edf2f7; color: #4a5568; border: none; padding: 10px 16px; border-radius: 8px; font-weight: bold; cursor: pointer;">🔔 Notifications</button>
         </div>
 
         <!-- TAB 0: BI DASHBOARD -->
@@ -330,6 +331,50 @@
                         <tr><td colspan="6" style="padding: 20px; text-align: center; color: #718096;">Loading fulfillment hub...</td></tr>
                     </tbody>
                 </table>
+            </div>
+        </div>
+
+        <!-- TAB 6: NOTIFICATIONS (Stock Requests & Delivery Reminder Opt-Ins) -->
+        <div id="admin-tab-notifications" class="admin-tab-content" style="display: none;">
+            <h3 style="margin-bottom: 4px;">🔔 Customer Notification Requests</h3>
+            <p style="color: #718096; font-size: 0.85rem; margin-top: 0;">Customers who asked to be notified when an item restocks, and customers who opted into delivery-day reminders. Sending these still needs to be done manually (SMS/WhatsApp/call) — this dashboard doesn't send anything automatically yet.</p>
+
+            <div style="background: white; padding: 20px; border-radius: 10px; border: 1px solid #e2e8f0; margin-bottom: 24px;">
+                <h4 style="margin-top: 0; color: #1a202c; font-size: 1rem;">📦 Restock Requests</h4>
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem;">
+                        <thead>
+                            <tr style="background: #f7fafc; border-bottom: 2px solid #e2e8f0; color: #4a5568;">
+                                <th style="padding: 10px;">Requested</th>
+                                <th style="padding: 10px;">Product</th>
+                                <th style="padding: 10px;">Phone</th>
+                                <th style="padding: 10px; text-align: center;">Status</th>
+                                <th style="padding: 10px; text-align: center;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-stock-requests-table">
+                            <tr><td colspan="5" style="padding: 15px; text-align: center; color: #718096;">Loading restock requests...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div style="background: white; padding: 20px; border-radius: 10px; border: 1px solid #e2e8f0;">
+                <h4 style="margin-top: 0; color: #1a202c; font-size: 1rem;">🚚 Delivery Reminder Opt-Ins</h4>
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem;">
+                        <thead>
+                            <tr style="background: #f7fafc; border-bottom: 2px solid #e2e8f0; color: #4a5568;">
+                                <th style="padding: 10px;">Name</th>
+                                <th style="padding: 10px;">Phone</th>
+                                <th style="padding: 10px;">Default Office</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-reminder-optins-table">
+                            <tr><td colspan="3" style="padding: 15px; text-align: center; color: #718096;">Loading opt-ins...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
 
