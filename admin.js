@@ -1008,7 +1008,7 @@ async function loadProductLedger(productId, productName, productCode) {
                     <br><span style="color:#975a16;">
                         ${openOrderQty > 0
                             ? `${balQty} (ledger) − ${openOrderQty} (open orders, already deducted but not yet Delivered) = ${expectedFromOpenOrders}${stillUnexplained ? `, which still doesn't match live stock of ${liveStock} — the remaining ${Math.abs(expectedFromOpenOrders - liveStock)} unit(s) may reflect a manual stock edit outside the normal Purchases flow.` : ', which matches live stock — fully explained by orders in progress.'}`
-                            : `There are no open (in-progress) orders for this product, so this gap likely reflects a manual stock edit outside the normal Purchases flow.`
+                            : `There are no open (in-progress) orders for this product, so this gap likely reflects either a manual stock edit outside the normal Purchases flow, or an order that was cancelled (stock restored) and later reactivated before this fix — check Order Fulfillment for any such order and re-save its status to trigger a correction.`
                         }
                     </span>
                 ` : `<br><span>Ledger and live stock agree.</span>`}
@@ -1406,15 +1406,25 @@ async function updateFulfillmentStatus(orderId) {
 
     const newStatus = selectEl.value;
 
-    // Fetch the order first: need its current stock_restored flag (to avoid a
-    // double-restock) and its items (in case a restock is actually needed).
+    // Fetch the order first: need its previous status and stock_restored flag
+    // to figure out which direction (if any) stock needs to move, plus its
+    // items in case a stock change is actually needed.
     const { data: existingOrder, error: fetchErr } = await db.from('orders').select('*').eq('id', orderId).single();
     if (fetchErr || !existingOrder) {
         alert("Could not load this order before updating it: " + (fetchErr ? fetchErr.message : "not found"));
         return;
     }
 
-    const needsRestock = newStatus === 'Cancelled' && !existingOrder.stock_restored;
+    const wasCancelled = existingOrder.fulfillment_status === 'Cancelled';
+    const isNowCancelled = newStatus === 'Cancelled';
+
+    // Going INTO Cancelled: restore stock (only if not already restored)
+    const needsRestock = isNowCancelled && !wasCancelled && !existingOrder.stock_restored;
+    // Coming OUT of Cancelled into any active status: re-deduct the stock that
+    // was given back, so reactivating a cancelled order doesn't leave a
+    // permanent phantom surplus (this is exactly the case that flipping
+    // Cancelled → Delivered would otherwise create).
+    const needsRededuct = !isNowCancelled && wasCancelled && existingOrder.stock_restored;
 
     const { data, error } = await db
         .from('orders')
@@ -1430,9 +1440,10 @@ async function updateFulfillmentStatus(orderId) {
         return;
     }
 
-    let restockNote = '';
+    let stockNote = '';
+    const items = existingOrder.order_items_json || [];
+
     if (needsRestock) {
-        const items = existingOrder.order_items_json || [];
         const restoreFailures = [];
         for (const item of items) {
             const prodId = item.product && item.product.id;
@@ -1447,13 +1458,32 @@ async function updateFulfillmentStatus(orderId) {
         }
         if (restoreFailures.length === 0) {
             await db.from('orders').update({ stock_restored: true }).eq('id', orderId);
-            restockNote = " Stock was automatically restored for every item in this order.";
+            stockNote = " Stock was automatically restored for every item in this order.";
         } else {
-            restockNote = ` Stock could NOT be automatically restored for: ${restoreFailures.join(', ')} — please adjust it manually.`;
+            stockNote = ` Stock could NOT be automatically restored for: ${restoreFailures.join(', ')} — please adjust it manually.`;
+        }
+    } else if (needsRededuct) {
+        const dedFailures = [];
+        for (const item of items) {
+            const prodId = item.product && item.product.id;
+            if (!prodId) continue;
+            const { data: currentP } = await db.from('products').select('stock_qty').eq('id', prodId).single();
+            const newStock = ((currentP && currentP.stock_qty) || 0) - (item.qty || 1);
+            const { error: dedErr } = await db.from('products').update({ stock_qty: newStock }).eq('id', prodId);
+            if (dedErr) {
+                console.error(`Could not re-deduct stock for "${item.product.name}":`, dedErr);
+                dedFailures.push(item.product.name);
+            }
+        }
+        if (dedFailures.length === 0) {
+            await db.from('orders').update({ stock_restored: false }).eq('id', orderId);
+            stockNote = " This order was previously cancelled (and its stock restored) — since you've reactivated it, that stock has been deducted again.";
+        } else {
+            stockNote = ` Could NOT re-deduct stock for: ${dedFailures.join(', ')} — please adjust it manually.`;
         }
     }
 
-    alert(`Order #${orderId} fulfillment status updated to "${newStatus}" successfully!${restockNote}`);
+    alert(`Order #${orderId} fulfillment status updated to "${newStatus}" successfully!${stockNote}`);
     loadAdminOrders();
     loadStockHoldings();
 }
