@@ -2,6 +2,301 @@ const SUPABASE_URL = "https://cziefuaclocpwicwjprb.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_j_MkiOlGUZOBsR8TSxIM1w_pnQ_B1xx";
 let db;
 
+// --- BUSINESS / CATEGORY / SUB-CATEGORY / BRAND MASTER DATA ---
+// business_master columns are read exactly as shown in the Supabase table
+// editor: Business, Category, Sub_Category. brand_master: Brands.
+// If these were actually created with different casing, the queries below
+// will fail — check the browser console for a clear error naming the table.
+let businessMasterRows = []; // [{ id, business, category, subCategory }]
+let brandMasterRows = [];    // [{ id, brand }]
+
+const NEW_OPTION_VALUE = "__add_new__";
+
+async function loadBusinessMaster() {
+    try {
+        const { data, error } = await db.from('business_master').select('*').order('Business');
+        if (error) throw error;
+        businessMasterRows = (data || []).map(r => ({
+            id: r.id,
+            business: r.Business,
+            category: r.Category,
+            subCategory: r.Sub_Category
+        }));
+    } catch (err) {
+        console.error("Could not load business_master (check that its columns are named Business/Category/Sub_Category):", err);
+        businessMasterRows = [];
+    }
+    populateBusinessDropdown();
+    renderBusinessMasterTable();
+}
+
+async function loadBrandMaster() {
+    try {
+        const { data, error } = await db.from('brand_master').select('*').order('Brands');
+        if (error) throw error;
+        brandMasterRows = (data || []).map(r => ({ id: r.id, brand: r.Brands }));
+    } catch (err) {
+        console.error("Could not load brand_master (check that its column is named Brands):", err);
+        brandMasterRows = [];
+    }
+    populateBrandDropdown();
+    renderBrandMasterTable();
+}
+
+function populateBusinessDropdown(selected) {
+    const select = document.getElementById("p-business");
+    if (!select) return;
+    let businesses = [...new Set(businessMasterRows.map(r => r.business))].filter(Boolean).sort();
+    if (selected && !businesses.includes(selected)) businesses = [selected, ...businesses];
+
+    select.innerHTML = `<option value="">-- Select Business --</option>` +
+        businesses.map(b => `<option value="${b}">${b}</option>`).join('') +
+        `<option value="${NEW_OPTION_VALUE}">➕ Add New Business...</option>`;
+
+    if (selected) select.value = selected;
+}
+
+function populateCategoryDropdown(business, selected) {
+    const select = document.getElementById("p-category");
+    if (!select) return;
+
+    if (!business) {
+        select.innerHTML = `<option value="">-- Select Category --</option>`;
+        return;
+    }
+
+    let categories = [...new Set(businessMasterRows.filter(r => r.business === business).map(r => r.category))].filter(Boolean).sort();
+    if (selected && !categories.includes(selected)) categories = [selected, ...categories];
+
+    select.innerHTML = `<option value="">-- Select Category --</option>` +
+        categories.map(c => `<option value="${c}">${c}</option>`).join('') +
+        `<option value="${NEW_OPTION_VALUE}">➕ Add New Category...</option>`;
+
+    if (selected) select.value = selected;
+}
+
+function populateSubCategoryDropdown(business, category, selected) {
+    const select = document.getElementById("p-subcategory");
+    if (!select) return;
+
+    if (!business || !category) {
+        select.innerHTML = `<option value="">-- Select Sub-Category --</option>`;
+        return;
+    }
+
+    let subCats = [...new Set(businessMasterRows.filter(r => r.business === business && r.category === category).map(r => r.subCategory))].filter(Boolean).sort();
+    if (selected && !subCats.includes(selected)) subCats = [selected, ...subCats];
+
+    select.innerHTML = `<option value="">-- Select Sub-Category --</option>` +
+        subCats.map(s => `<option value="${s}">${s}</option>`).join('') +
+        `<option value="${NEW_OPTION_VALUE}">➕ Add New Sub-Category...</option>`;
+
+    if (selected) select.value = selected;
+}
+
+function populateBrandDropdown(selected) {
+    const select = document.getElementById("p-brand");
+    if (!select) return;
+    let brands = [...new Set(brandMasterRows.map(r => r.brand))].filter(Boolean).sort();
+    if (selected && !brands.includes(selected)) brands = [selected, ...brands];
+
+    select.innerHTML = `<option value="">-- Select Brand --</option>` +
+        brands.map(b => `<option value="${b}">${b}</option>`).join('') +
+        `<option value="${NEW_OPTION_VALUE}">➕ Add New Brand...</option>`;
+
+    if (selected) select.value = selected;
+}
+
+// Handles cascading + the inline "Add New..." quick-add flow for
+// Business/Category/Sub-Category on the product form.
+async function onBusinessMasterFieldChange(level) {
+    const businessSelect = document.getElementById("p-business");
+    const categorySelect = document.getElementById("p-category");
+
+    if (level === 'business') {
+        if (businessSelect.value === NEW_OPTION_VALUE) {
+            const newBusiness = prompt("New Business name:");
+            if (!newBusiness || !newBusiness.trim()) { businessSelect.value = ""; return; }
+            const newCategory = prompt(`New Category under "${newBusiness.trim()}":`);
+            if (!newCategory || !newCategory.trim()) { businessSelect.value = ""; return; }
+            const newSubCategory = prompt(`New Sub-Category under "${newCategory.trim()}":`);
+            if (!newSubCategory || !newSubCategory.trim()) { businessSelect.value = ""; return; }
+
+            const saved = await insertBusinessMasterRow(newBusiness.trim(), newCategory.trim(), newSubCategory.trim());
+            if (!saved) { businessSelect.value = ""; return; }
+
+            await loadBusinessMaster();
+            populateBusinessDropdown(newBusiness.trim());
+            populateCategoryDropdown(newBusiness.trim(), newCategory.trim());
+            populateSubCategoryDropdown(newBusiness.trim(), newCategory.trim(), newSubCategory.trim());
+            return;
+        }
+        populateCategoryDropdown(businessSelect.value);
+        populateSubCategoryDropdown(null, null); // reset until a category is chosen
+        return;
+    }
+
+    if (level === 'category') {
+        const business = businessSelect.value;
+        if (categorySelect.value === NEW_OPTION_VALUE) {
+            const newCategory = prompt(`New Category under "${business}":`);
+            if (!newCategory || !newCategory.trim()) { categorySelect.value = ""; return; }
+            const newSubCategory = prompt(`New Sub-Category under "${newCategory.trim()}":`);
+            if (!newSubCategory || !newSubCategory.trim()) { categorySelect.value = ""; return; }
+
+            const saved = await insertBusinessMasterRow(business, newCategory.trim(), newSubCategory.trim());
+            if (!saved) { categorySelect.value = ""; return; }
+
+            await loadBusinessMaster();
+            populateBusinessDropdown(business);
+            populateCategoryDropdown(business, newCategory.trim());
+            populateSubCategoryDropdown(business, newCategory.trim(), newSubCategory.trim());
+            return;
+        }
+        populateSubCategoryDropdown(business, categorySelect.value);
+        return;
+    }
+
+    if (level === 'subcategory') {
+        const subCategorySelect = document.getElementById("p-subcategory");
+        const business = businessSelect.value;
+        const category = categorySelect.value;
+        if (subCategorySelect.value === NEW_OPTION_VALUE) {
+            const newSubCategory = prompt(`New Sub-Category under "${business} / ${category}":`);
+            if (!newSubCategory || !newSubCategory.trim()) { subCategorySelect.value = ""; return; }
+
+            const saved = await insertBusinessMasterRow(business, category, newSubCategory.trim());
+            if (!saved) { subCategorySelect.value = ""; return; }
+
+            await loadBusinessMaster();
+            populateBusinessDropdown(business);
+            populateCategoryDropdown(business, category);
+            populateSubCategoryDropdown(business, category, newSubCategory.trim());
+        }
+    }
+}
+
+async function onBrandMasterFieldChange() {
+    const brandSelect = document.getElementById("p-brand");
+    if (brandSelect.value !== NEW_OPTION_VALUE) return;
+
+    const newBrand = prompt("New Brand name:");
+    if (!newBrand || !newBrand.trim()) { brandSelect.value = ""; return; }
+
+    const saved = await insertBrandMasterRow(newBrand.trim());
+    if (!saved) { brandSelect.value = ""; return; }
+
+    await loadBrandMaster();
+    populateBrandDropdown(newBrand.trim());
+}
+
+async function insertBusinessMasterRow(business, category, subCategory) {
+    try {
+        const { error } = await db.from('business_master').insert([{
+            Business: business, Category: category, Sub_Category: subCategory
+        }]);
+        if (error) throw error;
+        return true;
+    } catch (err) {
+        console.error("Could not save new business/category/sub-category:", err);
+        alert("Could not save this entry: " + err.message);
+        return false;
+    }
+}
+
+async function insertBrandMasterRow(brand) {
+    try {
+        const { error } = await db.from('brand_master').insert([{ Brands: brand }]);
+        if (error) throw error;
+        return true;
+    } catch (err) {
+        console.error("Could not save new brand:", err);
+        alert("Could not save this brand: " + err.message);
+        return false;
+    }
+}
+
+// --- MANAGE LISTS TAB: bulk add/remove for the master tables ---
+async function addBusinessMasterRow(e) {
+    e.preventDefault();
+    const business = document.getElementById("new-bm-business").value.trim();
+    const category = document.getElementById("new-bm-category").value.trim();
+    const subCategory = document.getElementById("new-bm-subcategory").value.trim();
+    if (!business || !category || !subCategory) return;
+
+    const saved = await insertBusinessMasterRow(business, category, subCategory);
+    if (saved) {
+        document.getElementById("new-bm-business").value = "";
+        document.getElementById("new-bm-category").value = "";
+        document.getElementById("new-bm-subcategory").value = "";
+        loadBusinessMaster();
+    }
+}
+
+async function deleteBusinessMasterRow(id) {
+    if (!confirm("Remove this combination from the list? Existing products keep their current values.")) return;
+    await db.from('business_master').delete().eq('id', id);
+    loadBusinessMaster();
+}
+
+function renderBusinessMasterTable() {
+    const tbody = document.getElementById("admin-business-master-table");
+    if (!tbody) return;
+
+    if (businessMasterRows.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" style="padding: 15px; text-align: center; color: #718096;">No entries yet.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = businessMasterRows.map(r => `
+        <tr style="border-bottom:1px solid #edf2f7;">
+            <td style="padding:8px 10px;">${r.business}</td>
+            <td style="padding:8px 10px;">${r.category}</td>
+            <td style="padding:8px 10px;">${r.subCategory}</td>
+            <td style="padding:8px 10px; text-align:center;">
+                <button type="button" onclick="deleteBusinessMasterRow(${r.id})" style="background:#e53e3e; color:white; border:none; padding:3px 8px; border-radius:4px; cursor:pointer; font-size:0.72rem;">Delete</button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+async function addBrandMasterRow(e) {
+    e.preventDefault();
+    const brand = document.getElementById("new-brand-name").value.trim();
+    if (!brand) return;
+
+    const saved = await insertBrandMasterRow(brand);
+    if (saved) {
+        document.getElementById("new-brand-name").value = "";
+        loadBrandMaster();
+    }
+}
+
+async function deleteBrandMasterRow(id) {
+    if (!confirm("Remove this brand from the list?")) return;
+    await db.from('brand_master').delete().eq('id', id);
+    loadBrandMaster();
+}
+
+function renderBrandMasterTable() {
+    const tbody = document.getElementById("admin-brand-master-table");
+    if (!tbody) return;
+
+    if (brandMasterRows.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="2" style="padding: 15px; text-align: center; color: #718096;">No brands yet.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = brandMasterRows.map(r => `
+        <tr style="border-bottom:1px solid #edf2f7;">
+            <td style="padding:8px 10px;">${r.brand}</td>
+            <td style="padding:8px 10px; text-align:center;">
+                <button type="button" onclick="deleteBrandMasterRow(${r.id})" style="background:#e53e3e; color:white; border:none; padding:3px 8px; border-radius:4px; cursor:pointer; font-size:0.72rem;">Delete</button>
+            </td>
+        </tr>
+    `).join('');
+}
+
 window.onload = function() {
     try {
         db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -13,6 +308,8 @@ window.onload = function() {
         loadPurchasesHistory();
         loadStockRequests();
         loadReminderOptIns();
+        loadBusinessMaster();
+        loadBrandMaster();
         
         // Load Analytics and P&L on initial startup if dashboard tab is active
         loadBIDashboard();
@@ -61,6 +358,10 @@ function switchAdminTab(tabName) {
     if (tabName === 'notifications') {
         loadStockRequests();
         loadReminderOptIns();
+    }
+    if (tabName === 'lists') {
+        loadBusinessMaster();
+        loadBrandMaster();
     }
 }
 
@@ -188,9 +489,13 @@ function editProduct(p) {
     document.getElementById("product-id").value = p.id;
     document.getElementById("p-name").value = p.name;
     document.getElementById("p-code").value = p.product_code || '';
-    document.getElementById("p-business").value = p.business || '';
-    document.getElementById("p-category").value = p.category || '';
-    document.getElementById("p-subcategory").value = p.sub_category || '';
+
+    // Cascading dropdowns must be populated level-by-level so each select
+    // has the right options before we try to set its value.
+    populateBusinessDropdown(p.business || '');
+    populateCategoryDropdown(p.business || '', p.category || '');
+    populateSubCategoryDropdown(p.business || '', p.category || '', p.sub_category || '');
+    populateBrandDropdown(p.brand || '');
     
     // Pricing Module Mapping and Locking
     const costInput = document.getElementById("p-cost-price");
@@ -206,7 +511,6 @@ function editProduct(p) {
     document.getElementById("p-price").value = p.price;
     document.getElementById("p-deal-price").value = p.deal_price || '';
     
-    document.getElementById("p-brand").value = p.brand || '';
     document.getElementById("p-image").value = p.image_url || '';
     document.getElementById("p-sell-oos").value = p.sell_oos || 'N';
     document.getElementById("p-active").checked = p.is_active;
@@ -225,6 +529,12 @@ async function deleteProduct(id) {
 function resetProductForm() {
     document.getElementById("admin-product-form").reset();
     document.getElementById("product-id").value = "";
+
+    // Explicitly reset the cascading dropdowns back to a clean "nothing selected" state
+    populateBusinessDropdown("");
+    populateCategoryDropdown(null, "");
+    populateSubCategoryDropdown(null, null, "");
+    populateBrandDropdown("");
     
     // Unlock cost price for new product entry
     const costInput = document.getElementById("p-cost-price");
