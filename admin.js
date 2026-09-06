@@ -386,6 +386,12 @@ function loadDataForTab(tabName) {
             setMovementPreset('this_month');
         }
     }
+    if (tabName === 'customer-ledger') {
+        loadCustLedgerCustomerList();
+        if (custLedgerCurrentCustomer) {
+            loadCustomerLedger(custLedgerCurrentCustomer.phone, custLedgerCurrentCustomer.name);
+        }
+    }
 }
 
 // Refreshes the tab currently on screen in place — no navigation, no losing
@@ -1076,6 +1082,197 @@ function jumpToProductLedger(productId) {
     const info = movementProductInfoCache[productId] || {};
     ledgerCurrentProduct = { id: productId, name: info.name || 'Unknown Product', code: info.product_code || '' };
     switchAdminTab('ledger');
+}
+
+// --- CUSTOMER LEDGER / ACCOUNTS RECEIVABLE ---
+let custLedgerCustomersCache = [];
+let custLedgerCurrentCustomer = null; // { phone, name } — for refreshCurrentTab()
+
+async function loadCustLedgerCustomerList() {
+    try {
+        const { data: customers, error } = await db.from('customers').select('phone_number, title, first_name, last_name').order('first_name');
+        if (error) throw error;
+        custLedgerCustomersCache = (customers || []).map(c => ({
+            phone: c.phone_number,
+            name: `${c.title || ''} ${c.first_name || ''} ${c.last_name || ''}`.trim() || c.phone_number
+        }));
+
+        const datalist = document.getElementById("cust-ledger-datalist");
+        if (datalist) {
+            datalist.innerHTML = custLedgerCustomersCache.map(c =>
+                `<option value="${c.name} (${c.phone})">`
+            ).join('');
+        }
+    } catch (err) {
+        console.error("Could not load customer list for ledger:", err);
+    }
+}
+
+function onCustLedgerSearchChange() {
+    const input = document.getElementById("cust-ledger-search");
+    if (!input) return;
+    const typed = input.value.trim();
+
+    // Prefer matching the "(phone)" suffix from a picked suggestion — unambiguous
+    // even with duplicate names. Fall back to a raw phone-number match for
+    // anyone who just types digits without picking a suggestion.
+    const match = typed.match(/\(([^)]+)\)\s*$/);
+    let customer = null;
+
+    if (match) {
+        customer = custLedgerCustomersCache.find(c => c.phone === match[1]);
+    }
+    if (!customer) {
+        customer = custLedgerCustomersCache.find(c => c.phone === typed || c.name === typed);
+    }
+
+    if (customer) {
+        loadCustomerLedger(customer.phone, customer.name);
+    }
+}
+
+async function loadCustomerLedger(phone, name) {
+    custLedgerCurrentCustomer = { phone, name };
+
+    const resultsEl = document.getElementById("cust-ledger-results");
+    const nameEl = document.getElementById("cust-ledger-name");
+    const phoneEl = document.getElementById("cust-ledger-phone");
+    const balanceBadgeEl = document.getElementById("cust-ledger-balance-badge");
+    const pendingNoteEl = document.getElementById("cust-ledger-pending-note");
+    const tbody = document.getElementById("cust-ledger-table");
+    if (!resultsEl || !tbody) return;
+
+    resultsEl.style.display = "block";
+    nameEl.innerText = name;
+    phoneEl.innerText = phone;
+    tbody.innerHTML = `<tr><td colspan="8" style="padding:15px; text-align:center; color:#718096;">Loading...</td></tr>`;
+
+    // Default the payment form's date to today for convenience
+    const dateInput = document.getElementById("payment-date");
+    if (dateInput && !dateInput.value) dateInput.value = new Date().toISOString().split('T')[0];
+
+    try {
+        const [{ data: deliveredOrders, error: ordErr }, { data: pendingOrders, error: pendErr }, { data: payments, error: payErr }] = await Promise.all([
+            db.from('orders').select('*').eq('customer_phone', phone).eq('fulfillment_status', 'Delivered'),
+            db.from('orders').select('*').eq('customer_phone', phone).not('fulfillment_status', 'in', '("Delivered","Cancelled")'),
+            db.from('customer_payments').select('*').eq('customer_phone', phone)
+        ]);
+        if (ordErr) throw ordErr;
+        if (pendErr) throw pendErr;
+        if (payErr) throw payErr;
+
+        const transactions = [];
+
+        (deliveredOrders || []).forEach(o => {
+            transactions.push({
+                date: o.created_at,
+                type: 'Invoice',
+                ref: o.order_number || `#ORD-${o.id}`,
+                debit: parseFloat(o.total_amount || 0),
+                credit: 0,
+                deletable: false
+            });
+        });
+
+        (payments || []).forEach(p => {
+            transactions.push({
+                date: p.payment_date,
+                type: 'Payment',
+                ref: `${p.payment_method || 'Payment'}${p.note ? ' — ' + p.note : ''}`,
+                debit: 0,
+                credit: parseFloat(p.amount || 0),
+                deletable: true,
+                paymentId: p.id
+            });
+        });
+
+        transactions.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+        let balance = 0;
+        tbody.innerHTML = transactions.length === 0
+            ? `<tr><td colspan="8" style="padding:15px; text-align:center; color:#718096;">No invoices or payments recorded yet.</td></tr>`
+            : transactions.map((t, idx) => {
+                balance += t.debit - t.credit;
+                const typeColor = t.type === 'Invoice' ? '#3182ce' : '#0baf65';
+                return `
+                    <tr style="border-bottom:1px solid #edf2f7;">
+                        <td style="padding:7px 6px;">${idx + 1}</td>
+                        <td style="padding:7px 6px; white-space:nowrap;">${t.date ? new Date(t.date).toLocaleDateString() : '-'}</td>
+                        <td style="padding:7px 6px;"><span style="color:${typeColor}; font-weight:bold;">${t.type}</span></td>
+                        <td style="padding:7px 6px;">${t.ref}</td>
+                        <td style="padding:7px 6px; text-align:right;">${t.debit ? 'K ' + t.debit.toFixed(2) : ''}</td>
+                        <td style="padding:7px 6px; text-align:right;">${t.credit ? 'K ' + t.credit.toFixed(2) : ''}</td>
+                        <td style="padding:7px 6px; text-align:right; font-weight:bold;">K ${balance.toFixed(2)}</td>
+                        <td style="padding:7px 6px; text-align:center;">${t.deletable ? `<button type="button" onclick="deleteCustomerPayment(${t.paymentId})" style="background:#e53e3e; color:white; border:none; padding:3px 8px; border-radius:4px; cursor:pointer; font-size:0.7rem;">Delete</button>` : ''}</td>
+                    </tr>
+                `;
+            }).join('');
+
+        const pendingTotal = (pendingOrders || []).reduce((sum, o) => sum + parseFloat(o.total_amount || 0), 0);
+
+        if (balanceBadgeEl) {
+            balanceBadgeEl.innerHTML = balance > 0
+                ? `<span style="color:#e53e3e;">Owes K ${balance.toFixed(2)}</span>`
+                : balance < 0
+                    ? `<span style="color:#3182ce;">Credit K ${Math.abs(balance).toFixed(2)}</span>`
+                    : `<span style="color:#0baf65;">Settled (K 0.00)</span>`;
+        }
+        if (pendingNoteEl) {
+            pendingNoteEl.innerText = pendingTotal > 0
+                ? `Plus K ${pendingTotal.toFixed(2)} in orders placed but not yet delivered (not yet invoiced on this ledger).`
+                : '';
+        }
+    } catch (err) {
+        console.error("Error loading customer ledger:", err);
+        tbody.innerHTML = `<tr><td colspan="8" style="padding:15px; text-align:center; color:red;">Failed to load ledger. If customer_payments doesn't exist yet, run the latest db-migration.sql first.</td></tr>`;
+    }
+}
+
+async function recordCustomerPayment(e) {
+    e.preventDefault();
+    if (!custLedgerCurrentCustomer) return;
+
+    const amount = parseFloat(document.getElementById("payment-amount").value);
+    const date = document.getElementById("payment-date").value;
+    const method = document.getElementById("payment-method").value;
+    const note = document.getElementById("payment-note").value.trim() || null;
+
+    if (!amount || amount <= 0) {
+        alert("Please enter a valid payment amount.");
+        return;
+    }
+
+    try {
+        const { error } = await db.from('customer_payments').insert([{
+            customer_phone: custLedgerCurrentCustomer.phone,
+            amount: amount,
+            payment_date: date,
+            payment_method: method,
+            note: note
+        }]);
+        if (error) throw error;
+
+        document.getElementById("payment-amount").value = '';
+        document.getElementById("payment-note").value = '';
+        loadCustomerLedger(custLedgerCurrentCustomer.phone, custLedgerCurrentCustomer.name);
+    } catch (err) {
+        console.error("Error recording payment:", err);
+        alert("Could not record this payment: " + err.message);
+    }
+}
+
+async function deleteCustomerPayment(paymentId) {
+    if (!confirm("Delete this payment record? This will increase the customer's outstanding balance.")) return;
+    try {
+        const { error } = await db.from('customer_payments').delete().eq('id', paymentId);
+        if (error) throw error;
+        if (custLedgerCurrentCustomer) {
+            loadCustomerLedger(custLedgerCurrentCustomer.phone, custLedgerCurrentCustomer.name);
+        }
+    } catch (err) {
+        console.error("Error deleting payment:", err);
+        alert("Could not delete this payment: " + err.message);
+    }
 }
 
 // --- PERIOD STOCK MOVEMENT REPORT ---
