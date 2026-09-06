@@ -497,15 +497,20 @@ async function cancelOrder(orderId) {
 
         // Restore stock for each item (best-effort; mirrors the deduction at checkout)
         const items = order.order_items_json || [];
+        const restoreFailures = [];
         for (const item of items) {
             const prodId = item.product && item.product.id;
             if (!prodId) continue;
             const { data: currentP } = await db.from('products').select('stock_qty').eq('id', prodId).single();
             const restoredStock = ((currentP && currentP.stock_qty) || 0) + (item.qty || 1);
-            await db.from('products').update({ stock_qty: restoredStock }).eq('id', prodId);
+            const { error: restoreErr } = await db.from('products').update({ stock_qty: restoredStock }).eq('id', prodId);
+            if (restoreErr) {
+                console.error(`Could not restore stock for "${item.product.name}":`, restoreErr);
+                restoreFailures.push(item.product.name);
+            }
         }
 
-        alert(`Order ${orderLabel} has been cancelled.`);
+        alert(`Order ${orderLabel} has been cancelled.` + (restoreFailures.length > 0 ? `\n\nNote: stock for ${restoreFailures.join(", ")} could not be automatically restored — please adjust it manually if needed.` : ''));
         const phone = localStorage.getItem("padesk_phone");
         if (phone) loadAccountHistory(phone);
         loadProducts(); // refresh catalog so restored stock is reflected immediately
@@ -1121,11 +1126,12 @@ async function notifyWhenBackInStock(productId) {
     }
 
     try {
-        await db.from('stock_notifications').insert([{
+        const { error } = await db.from('stock_notifications').insert([{
             product_id: productId,
             phone_number: phone,
             notified: false
         }]);
+        if (error) throw error;
         alert(`Got it! We'll let you know when "${product.name}" is back in stock.`);
     } catch (err) {
         console.error("Could not save stock notification request:", err);
@@ -1626,12 +1632,13 @@ async function saveCustomerCustomCombo(phone, items) {
             ? `${topBrands.slice(0, 2).join(' & ')} Office Bundle` 
             : `Custom Office Combo #${Math.floor(Math.random() * 900) + 100}`;
 
-        await db.from('customer_combos').insert([{
+        const { error: comboInsertErr } = await db.from('customer_combos').insert([{
             customer_phone: phone,
             combo_name: comboName,
             items_json: items,
             product_signature: productSignature
         }]);
+        if (comboInsertErr) throw comboInsertErr;
     } catch (err) {
         console.error("Error saving custom combo template:", err);
     }
