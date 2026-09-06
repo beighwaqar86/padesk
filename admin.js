@@ -884,6 +884,8 @@ async function loadProductLedger(productId, productName, productCode) {
     subtitleEl.innerText = productCode ? `Code: ${productCode}` : '';
     tbody.innerHTML = `<tr><td colspan="11" style="padding:15px; text-align:center; color:#718096;">Loading ledger...</td></tr>`;
     reconEl.innerHTML = '';
+    const openOrdersDetailEl = document.getElementById("ledger-open-orders-detail");
+    if (openOrdersDetailEl) { openOrdersDetailEl.style.display = "none"; openOrdersDetailEl.innerHTML = ''; }
 
     try {
         // Build/reuse a phone → name lookup so Sale rows can show a customer name
@@ -1400,7 +1402,17 @@ async function updateFulfillmentStatus(orderId) {
     if (!selectEl) return;
 
     const newStatus = selectEl.value;
-    
+
+    // Fetch the order first: need its current stock_restored flag (to avoid a
+    // double-restock) and its items (in case a restock is actually needed).
+    const { data: existingOrder, error: fetchErr } = await db.from('orders').select('*').eq('id', orderId).single();
+    if (fetchErr || !existingOrder) {
+        alert("Could not load this order before updating it: " + (fetchErr ? fetchErr.message : "not found"));
+        return;
+    }
+
+    const needsRestock = newStatus === 'Cancelled' && !existingOrder.stock_restored;
+
     const { data, error } = await db
         .from('orders')
         .update({ fulfillment_status: newStatus })
@@ -1409,10 +1421,36 @@ async function updateFulfillmentStatus(orderId) {
     
     if (error) {
         alert("Database Error: " + error.message);
+        return;
     } else if (!data || data.length === 0) {
         alert("Update blocked! Check your Supabase RLS policies for the 'orders' table.");
-    } else {
-        alert(`Order #${orderId} fulfillment status updated to "${newStatus}" successfully!`);
-        loadAdminOrders();
+        return;
     }
+
+    let restockNote = '';
+    if (needsRestock) {
+        const items = existingOrder.order_items_json || [];
+        const restoreFailures = [];
+        for (const item of items) {
+            const prodId = item.product && item.product.id;
+            if (!prodId) continue;
+            const { data: currentP } = await db.from('products').select('stock_qty').eq('id', prodId).single();
+            const restoredStock = ((currentP && currentP.stock_qty) || 0) + (item.qty || 1);
+            const { error: restoreErr } = await db.from('products').update({ stock_qty: restoredStock }).eq('id', prodId);
+            if (restoreErr) {
+                console.error(`Could not restore stock for "${item.product.name}":`, restoreErr);
+                restoreFailures.push(item.product.name);
+            }
+        }
+        if (restoreFailures.length === 0) {
+            await db.from('orders').update({ stock_restored: true }).eq('id', orderId);
+            restockNote = " Stock was automatically restored for every item in this order.";
+        } else {
+            restockNote = ` Stock could NOT be automatically restored for: ${restoreFailures.join(', ')} — please adjust it manually.`;
+        }
+    }
+
+    alert(`Order #${orderId} fulfillment status updated to "${newStatus}" successfully!${restockNote}`);
+    loadAdminOrders();
+    loadStockHoldings();
 }
