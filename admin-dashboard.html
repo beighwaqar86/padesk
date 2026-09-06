@@ -149,6 +149,7 @@
             <button type="button" onclick="switchAdminTab('notifications')" id="tab-btn-notifications" class="admin-tab-btn">🔔 Notifications</button>
             <button type="button" onclick="switchAdminTab('lists')" id="tab-btn-lists" class="admin-tab-btn">🗂️ Manage Lists</button>
             <button type="button" onclick="switchAdminTab('ledger')" id="tab-btn-ledger" class="admin-tab-btn">📒 Product Ledger</button>
+            <button type="button" onclick="switchAdminTab('movement')" id="tab-btn-movement" class="admin-tab-btn">📅 Stock Movement</button>
         </div>
 
         <!-- TAB 0: BI DASHBOARD -->
@@ -616,6 +617,59 @@
 
                 <div id="ledger-reconciliation-note" style="margin-top: 16px;"></div>
                 <div id="ledger-open-orders-detail" style="display: none; margin-top: 10px;"></div>
+            </div>
+        </div>
+
+        <!-- TAB 9: PERIOD STOCK MOVEMENT REPORT -->
+        <div id="admin-tab-movement" class="admin-tab-content" style="display: none;">
+            <h3 style="margin-bottom: 4px;">📅 Period Stock Movement Report</h3>
+            <p style="color: #718096; font-size: 0.85rem; margin-top: 0;">Opening → Purchased → Sold (delivered, at invoice price) → Closing, per product, for a chosen date range. Only products with at least one purchase or sale in the period are shown.</p>
+
+            <div class="admin-card" style="margin-bottom: 20px;">
+                <label style="font-size: 0.75rem; font-weight: 700; color: #4a5568; display: block; margin-bottom: 8px;">PERIOD</label>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px;">
+                    <button type="button" onclick="setMovementPreset('this_month')" class="admin-tab-btn" style="background:#edf2f7; color:#4a5568;">This Month</button>
+                    <button type="button" onclick="setMovementPreset('last_month')" class="admin-tab-btn" style="background:#edf2f7; color:#4a5568;">Last Month</button>
+                    <button type="button" onclick="setMovementPreset('this_year')" class="admin-tab-btn" style="background:#edf2f7; color:#4a5568;">This Year</button>
+                    <button type="button" onclick="setMovementPreset('all_time')" class="admin-tab-btn" style="background:#edf2f7; color:#4a5568;">All Time</button>
+                </div>
+                <div style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;">
+                    <div>
+                        <label style="font-size: 0.7rem; font-weight: 700; color: #718096;">FROM</label>
+                        <input type="date" id="movement-from-date" style="display:block; padding: 8px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 0.85rem;">
+                    </div>
+                    <div>
+                        <label style="font-size: 0.7rem; font-weight: 700; color: #718096;">TO</label>
+                        <input type="date" id="movement-to-date" style="display:block; padding: 8px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 0.85rem;">
+                    </div>
+                    <button type="button" onclick="applyMovementCustomRange()" style="background: #0baf65; color: white; border: none; padding: 9px 16px; border-radius: 6px; font-weight: bold; font-size: 0.82rem; cursor: pointer;">Apply</button>
+                </div>
+                <div id="movement-period-label" style="margin-top: 10px; font-size: 0.8rem; color: #4a5568; font-weight: 600;"></div>
+            </div>
+
+            <div class="admin-card">
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.82rem;">
+                        <thead>
+                            <tr style="background: #f7fafc; border-bottom: 2px solid #e2e8f0; color: #4a5568;">
+                                <th style="padding: 8px 6px;">Product</th>
+                                <th style="padding: 8px 6px;">Code</th>
+                                <th style="padding: 8px 6px; text-align: right;">Opening Qty</th>
+                                <th style="padding: 8px 6px; text-align: right;">Opening Value</th>
+                                <th style="padding: 8px 6px; text-align: right;">Purchased Qty</th>
+                                <th style="padding: 8px 6px; text-align: right;">Purchased Value</th>
+                                <th style="padding: 8px 6px; text-align: right;">Sold Qty</th>
+                                <th style="padding: 8px 6px; text-align: right;">Sold Value</th>
+                                <th style="padding: 8px 6px; text-align: right;">Closing Qty</th>
+                                <th style="padding: 8px 6px; text-align: right;">Closing Value</th>
+                            </tr>
+                        </thead>
+                        <tbody id="movement-report-table">
+                            <tr><td colspan="10" style="padding:15px; text-align:center; color:#718096;">Loading...</td></tr>
+                        </tbody>
+                        <tfoot id="movement-report-totals"></tfoot>
+                    </table>
+                </div>
             </div>
         </div>
 
