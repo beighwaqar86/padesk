@@ -994,9 +994,10 @@ async function loadProductLedger(productId, productName, productCode) {
         const mismatch = liveStock !== balQty;
         const expectedFromOpenOrders = balQty - openOrderQty;
         const stillUnexplained = expectedFromOpenOrders !== liveStock;
+        const negativeBalance = balQty < 0;
 
         reconEl.innerHTML = `
-            <div style="background: ${mismatch ? '#fffaf0' : '#e6f7f0'}; border: 1px solid ${mismatch ? '#f6d78e' : '#b2f5ea'}; border-radius: 8px; padding: 12px 16px; font-size: 0.82rem; color: ${mismatch ? '#975a16' : '#0baf65'};">
+            <div style="background: ${mismatch ? '#fffaf0' : '#e6f7f0'}; border: 1px solid ${mismatch ? '#f6d78e' : '#b2f5ea'}; border-radius: 8px; padding: 12px 16px; font-size: 0.82rem; color: ${mismatch ? '#975a16' : '#0baf65'}; margin-bottom: ${negativeBalance ? '10px' : '0'};">
                 <strong>Ledger Balance Qty:</strong> ${balQty}
                 &nbsp;|&nbsp;
                 <span style="${openOrderQty > 0 ? 'text-decoration: underline; cursor: pointer;' : ''}" ${openOrderQty > 0 ? 'onclick="toggleLedgerOpenOrdersDetail()"' : ''}>
@@ -1013,7 +1014,11 @@ async function loadProductLedger(productId, productName, productCode) {
                     </span>
                 ` : `<br><span>Ledger and live stock agree.</span>`}
             </div>
-            <div id="ledger-open-orders-detail" style="display:none; margin-top:10px;"></div>
+            ${negativeBalance ? `
+                <div style="background: #e9d8fd; border: 1px solid #d6bcfa; border-radius: 8px; padding: 12px 16px; font-size: 0.82rem; color: #6b46c1;">
+                    ⚠️ <strong>Negative balance:</strong> this product has been sold ${transactions.some(t => t.type === 'Purchase') ? 'more than has been purchased' : 'with no purchase history at all'} — it's currently being sold on the "Allow OOS Sale" setting. Ledger and live stock agreeing on a negative number just means the shortfall is being tracked consistently; it's not a data error. Record a Stock Purchase for this product when new stock arrives to bring both back to a normal positive balance.
+                </div>
+            ` : ''}
         `;
     } catch (err) {
         console.error("Error loading product ledger:", err);
