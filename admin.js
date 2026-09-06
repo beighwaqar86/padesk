@@ -327,19 +327,13 @@ window.onload = function() {
 
 function switchAdminTab(tabName) {
     document.querySelectorAll('.admin-tab-content').forEach(el => el.style.display = 'none');
-    document.querySelectorAll('[id^="tab-btn-"]').forEach(btn => {
-        btn.style.background = '#edf2f7';
-        btn.style.color = '#4a5568';
-    });
+    document.querySelectorAll('.admin-tab-btn').forEach(btn => btn.classList.remove('active'));
 
     const targetTab = document.getElementById(`admin-tab-${tabName}`);
     const targetBtn = document.getElementById(`tab-btn-${tabName}`);
 
     if (targetTab) targetTab.style.display = 'block';
-    if (targetBtn) {
-        targetBtn.style.background = '#0baf65';
-        targetBtn.style.color = 'white';
-    }
+    if (targetBtn) targetBtn.classList.add('active');
 
     // Trigger data loading based on active tab
     if (tabName === 'dashboard') {
@@ -679,6 +673,10 @@ async function loadPurchasesHistory() {
 }
 
 // --- STOCK ON HAND ---
+const LOW_STOCK_THRESHOLD = 10; // adjust here if you want a different cutoff for "low stock"
+let stockHoldingsCache = [];
+let stockShowOnlyLowFlag = false;
+
 async function loadStockHoldings() {
     const tbody = document.getElementById("admin-stock-holdings-table");
     if (!tbody) return;
@@ -686,43 +684,102 @@ async function loadStockHoldings() {
     try {
         const { data: products, error } = await db.from('products').select('*').order('name');
         if (error) throw error;
+        stockHoldingsCache = products || [];
+        renderStockHoldings();
+    } catch (err) {
+        console.error("Error loading stock:", err);
+        tbody.innerHTML = '<tr><td colspan="5" style="padding: 20px; text-align: center; color: red;">Failed to load stock data.</td></tr>';
+    }
+}
 
-        if (!products || products.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" style="padding: 15px; text-align: center;">No products found in inventory.</td></tr>';
-            return;
+function toggleLowStockOnly() {
+    stockShowOnlyLowFlag = !stockShowOnlyLowFlag;
+    renderStockHoldings();
+}
+
+function renderStockHoldings() {
+    const tbody = document.getElementById("admin-stock-holdings-table");
+    const summaryEl = document.getElementById("stock-alert-summary");
+    if (!tbody) return;
+
+    if (stockHoldingsCache.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="padding: 15px; text-align: center;">No products found in inventory.</td></tr>';
+        if (summaryEl) summaryEl.innerHTML = '';
+        return;
+    }
+
+    const outOfStockBlocked = stockHoldingsCache.filter(p => (p.stock_qty || 0) <= 0 && (p.sell_oos || 'N') !== 'Y');
+    const sellingNegative = stockHoldingsCache.filter(p => (p.stock_qty || 0) <= 0 && (p.sell_oos || 'N') === 'Y');
+    const lowStock = stockHoldingsCache.filter(p => (p.stock_qty || 0) > 0 && (p.stock_qty || 0) <= LOW_STOCK_THRESHOLD);
+    const alertCount = outOfStockBlocked.length + sellingNegative.length + lowStock.length;
+
+    if (summaryEl) {
+        summaryEl.innerHTML = alertCount > 0 ? `
+            <div style="background: #fffaf0; border: 1px solid #f6d78e; border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                <div style="font-size: 0.85rem; color: #975a16;">
+                    <strong>⚠️ ${alertCount} item(s) need attention:</strong>
+                    ${outOfStockBlocked.length} out of stock (blocked),
+                    ${sellingNegative.length} selling into negative stock,
+                    ${lowStock.length} running low (≤ ${LOW_STOCK_THRESHOLD} units)
+                </div>
+                <button type="button" onclick="toggleLowStockOnly()" style="background: ${stockShowOnlyLowFlag ? '#975a16' : 'white'}; color: ${stockShowOnlyLowFlag ? 'white' : '#975a16'}; border: 1px solid #975a16; padding: 6px 12px; border-radius: 6px; font-weight: bold; font-size: 0.78rem; cursor: pointer; white-space: nowrap;">
+                    ${stockShowOnlyLowFlag ? 'Show All Products' : 'Show Only These'}
+                </button>
+            </div>
+        ` : `<div style="background: #e6f7f0; border: 1px solid #b2f5ea; border-radius: 8px; padding: 10px 16px; margin-bottom: 16px; color: #0baf65; font-size: 0.85rem; font-weight: 600;">✅ All products are healthily stocked.</div>`;
+    }
+
+    const productsToShow = stockShowOnlyLowFlag
+        ? stockHoldingsCache.filter(p => {
+            const qty = p.stock_qty || 0;
+            return qty <= 0 || qty <= LOW_STOCK_THRESHOLD;
+        })
+        : stockHoldingsCache;
+
+    if (productsToShow.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="padding: 15px; text-align: center; color: #718096;">Nothing matches this filter.</td></tr>';
+        return;
+    }
+
+    let totalInventoryCapital = 0;
+
+    tbody.innerHTML = productsToShow.map(p => {
+        const qty = p.stock_qty || 0;
+        const sellOos = p.sell_oos || 'N';
+        const unitCost = parseFloat(p.cost_price || 0);
+        const totalVal = qty * unitCost;
+        totalInventoryCapital += totalVal;
+
+        let badgeStyle, badgeLabel;
+        if (qty <= 0 && sellOos === 'Y') {
+            badgeStyle = 'background: #e9d8fd; color: #6b46c1; padding: 2px 8px; border-radius: 4px; font-weight: bold;';
+            badgeLabel = `${qty} units ⚠️ Selling OOS`;
+        } else if (qty <= 0) {
+            badgeStyle = 'background: #fed7d7; color: #c53030; padding: 2px 8px; border-radius: 4px; font-weight: bold;';
+            badgeLabel = `${qty} units — Out of Stock`;
+        } else if (qty <= LOW_STOCK_THRESHOLD) {
+            badgeStyle = 'background: #fffaf0; color: #975a16; padding: 2px 8px; border-radius: 4px; font-weight: bold;';
+            badgeLabel = `${qty} units — Low`;
+        } else {
+            badgeStyle = 'background: #e6f7f0; color: #0baf65; padding: 2px 8px; border-radius: 4px; font-weight: bold;';
+            badgeLabel = `${qty} units`;
         }
 
-        let totalInventoryCapital = 0;
-
-        tbody.innerHTML = products.map(p => {
-            const qty = p.stock_qty || 0;
-            const unitCost = parseFloat(p.cost_price || 0);
-            const totalVal = qty * unitCost;
-            totalInventoryCapital += totalVal;
-
-            const stockBadgeStyle = qty <= 0 
-                ? 'background: #fed7d7; color: #c53030; padding: 2px 8px; border-radius: 4px; font-weight: bold;'
-                : 'background: #e6f7f0; color: #0baf65; padding: 2px 8px; border-radius: 4px; font-weight: bold;';
-
-            return `
-                <tr style="border-bottom: 1px solid #edf2f7;">
-                    <td style="padding: 10px; color: #4a5568;">${p.product_code || '-'}</td>
-                    <td style="padding: 10px; font-weight: 600;">${p.name}</td>
-                    <td style="padding: 10px; text-align: center;"><span style="${stockBadgeStyle}">${qty} units</span></td>
-                    <td style="padding: 10px; text-align: right;">K ${unitCost.toFixed(2)}</td>
-                    <td style="padding: 10px; text-align: right; font-weight: bold;">K ${totalVal.toFixed(2)}</td>
-                </tr>
-            `;
-        }).join('') + `
-            <tr style="background: #f8fafc; font-weight: bold; border-top: 2px solid #cbd5e0;">
-                <td colspan="4" style="padding: 12px; text-align: right;">Total Inventory Asset Value:</td>
-                <td style="padding: 12px; text-align: right; color: #0baf65;">K ${totalInventoryCapital.toFixed(2)}</td>
+        return `
+            <tr style="border-bottom: 1px solid #edf2f7;">
+                <td style="padding: 10px; color: #4a5568;">${p.product_code || '-'}</td>
+                <td style="padding: 10px; font-weight: 600;">${p.name}</td>
+                <td style="padding: 10px; text-align: center;"><span style="${badgeStyle}">${badgeLabel}</span></td>
+                <td style="padding: 10px; text-align: right;">K ${unitCost.toFixed(2)}</td>
+                <td style="padding: 10px; text-align: right; font-weight: bold;">K ${totalVal.toFixed(2)}</td>
             </tr>
         `;
-    } catch (err) {
-        console.error("Error loading stock holdings:", err);
-        tbody.innerHTML = `<tr><td colspan="5" style="padding: 15px; text-align: center; color: red;">Failed to load stock data.</td></tr>`;
-    }
+    }).join('') + `
+        <tr style="background: #f8fafc; font-weight: bold; border-top: 2px solid #cbd5e0;">
+            <td colspan="4" style="padding: 12px; text-align: right;">Total Inventory Asset Value${stockShowOnlyLowFlag ? ' (filtered)' : ''}:</td>
+            <td style="padding: 12px; text-align: right; color: #0baf65;">K ${totalInventoryCapital.toFixed(2)}</td>
+        </tr>
+    `;
 }
 
 // --- BI ANALYTICS DASHBOARD ---
@@ -836,14 +893,69 @@ async function loadAdminBanners() {
     const { data } = await db.from('banners').select('*').order('id', { ascending: false });
     const container = document.getElementById("admin-banners-list");
     if (!data || !container) return;
-    container.innerHTML = data.map(b => `
+    container.innerHTML = data.map(b => {
+        const added = b.times_added || 0;
+        const ordered = b.times_ordered || 0;
+        const rate = added > 0 ? Math.round((ordered / added) * 100) : 0;
+        return `
         <div style="border:1px solid #e2e8f0; padding:10px; border-radius:8px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
             <div>
                 <strong>${b.title}</strong><br><small>${b.subtitle || ''}</small>
+                <div style="margin-top:6px; display:flex; gap:8px; flex-wrap:wrap;">
+                    <span style="background:#ebf8ff; color:#2b6cb0; padding:2px 8px; border-radius:4px; font-size:0.7rem; font-weight:bold;">🛒 Added: ${added}</span>
+                    <span style="background:#e6f7f0; color:#0baf65; padding:2px 8px; border-radius:4px; font-size:0.7rem; font-weight:bold;">✅ Ordered: ${ordered}</span>
+                    <span style="background:#f7fafc; color:#4a5568; padding:2px 8px; border-radius:4px; font-size:0.7rem; font-weight:bold;">Conversion: ${rate}%</span>
+                </div>
             </div>
             <button type="button" onclick="deleteBanner(${b.id})" style="background:#e53e3e; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;">Delete</button>
         </div>
-    `).join('');
+    `}).join('');
+
+    loadSavedComboPerformance();
+}
+
+async function loadSavedComboPerformance() {
+    const container = document.getElementById("admin-saved-combos-performance");
+    if (!container) return;
+
+    try {
+        const { data, error } = await db.from('customer_combos')
+            .select('combo_name, customer_phone, times_added, times_ordered')
+            .order('times_added', { ascending: false })
+            .limit(15);
+        if (error) throw error;
+
+        if (!data || data.length === 0) {
+            container.innerHTML = '<p style="color:#718096; font-size:0.85rem;">No customer-saved combos yet.</p>';
+            return;
+        }
+
+        container.innerHTML = `
+            <table style="width:100%; border-collapse:collapse; text-align:left; font-size:0.85rem;">
+                <thead>
+                    <tr style="background:#f7fafc; border-bottom:2px solid #e2e8f0; color:#4a5568;">
+                        <th style="padding:8px 10px;">Combo Name</th>
+                        <th style="padding:8px 10px;">Customer</th>
+                        <th style="padding:8px 10px; text-align:center;">Added</th>
+                        <th style="padding:8px 10px; text-align:center;">Ordered</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${data.map(c => `
+                        <tr style="border-bottom:1px solid #edf2f7;">
+                            <td style="padding:8px 10px; font-weight:600;">${c.combo_name}</td>
+                            <td style="padding:8px 10px; color:#718096;">${c.customer_phone}</td>
+                            <td style="padding:8px 10px; text-align:center;">${c.times_added || 0}</td>
+                            <td style="padding:8px 10px; text-align:center;">${c.times_ordered || 0}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `;
+    } catch (err) {
+        console.error("Error loading saved combo performance:", err);
+        container.innerHTML = '<p style="color:red; font-size:0.85rem;">Failed to load — if this is a new feature, run the latest db-migration.sql first.</p>';
+    }
 }
 
 async function deleteBanner(id) {
