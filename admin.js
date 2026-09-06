@@ -1024,7 +1024,10 @@ async function loadProductLedger(productId, productName, productCode) {
 // --- BI ANALYTICS DASHBOARD ---
 async function loadBIDashboard() {
     try {
-        const { data: orders, error: orderErr } = await db.from('orders').select('total_amount, order_items_json');
+        // Delivered only — matches P&L Report's logic exactly, so both reports
+        // agree, and cancelled/in-progress orders (which haven't actually
+        // resulted in completed revenue) don't inflate these numbers.
+        const { data: orders, error: orderErr } = await db.from('orders').select('total_amount, order_items_json').eq('fulfillment_status', 'Delivered');
         if (orderErr) console.error("Orders fetch error:", orderErr.message);
 
         const { count: customerCount, error: custErr } = await db.from('customers').select('*', { count: 'exact', head: true });
