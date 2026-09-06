@@ -722,20 +722,40 @@ function loadCartFromStorage() {
 }
 
 // 9. HIERARCHICAL DRILL-DOWN FILTERS (LOCAL WORKSPACE IMAGES FOR BUSINESS & CATEGORY)
+
+// Curated display order confirmed against the real business_master values
+// (Grocery, Health & Beauty, Baby, Confectionary, Stationary, Electronics).
+// Anything not in this list (e.g. a brand-new business added later) still
+// shows up — just appended after these, alphabetically.
+const BUSINESS_DISPLAY_ORDER = ['Grocery', 'Health & Beauty', 'Baby', 'Confectionary', 'Stationary', 'Stationery', 'Electronics'];
+
+function sortBusinessesByPriority(businesses) {
+    return [...businesses].sort((a, b) => {
+        const aRank = BUSINESS_DISPLAY_ORDER.indexOf(a);
+        const bRank = BUSINESS_DISPLAY_ORDER.indexOf(b);
+        const aScore = aRank === -1 ? BUSINESS_DISPLAY_ORDER.length : aRank;
+        const bScore = bRank === -1 ? BUSINESS_DISPLAY_ORDER.length : bRank;
+        if (aScore !== bScore) return aScore - bScore;
+        return a.localeCompare(b);
+    });
+}
+
 function buildDynamicMasterFilters() {
     const rawBusinesses = [...new Set(allProducts.map(p => p.business).filter(Boolean))];
-    const businesses = ['ALL', ...rawBusinesses];
+    const businesses = ['ALL', ...sortBusinessesByPriority(rawBusinesses)];
 
     const businessCircles = document.getElementById("business-circles");
     
-    // Keyed to match the exact values saved by the admin dashboard's "Business"
-    // dropdown (Groceries, Retail, Electronics, Beauty), with a couple of legacy
-    // aliases kept for any products tagged before this naming was standardized.
+    // Keyed to match the real business_master values confirmed via the database:
+    // Grocery, Health & Beauty, Baby, Confectionary, Stationary, Electronics —
+    // with a couple of legacy aliases kept for any products tagged before this
+    // naming was confirmed (e.g. older "Groceries"/"Stationery" spellings).
     const businessImages = {
-        'Groceries': 'images/business/grocery.png',
         'Grocery': 'images/business/grocery.png',
-        'Beauty': 'images/business/beauty.png',
+        'Groceries': 'images/business/grocery.png',
         'Health & Beauty': 'images/business/beauty.png',
+        'Beauty': 'images/business/beauty.png',
+        'Stationary': 'images/business/stationery.png',
         'Stationery': 'images/business/stationery.png',
         'Electronics': 'images/business/electronics.png'
     };
