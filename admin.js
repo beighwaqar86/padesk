@@ -1871,12 +1871,14 @@ async function updateFulfillmentStatus(orderId) {
     // Cancelled → Delivered would otherwise create).
     const needsRededuct = !isNowCancelled && wasCancelled && existingOrder.stock_restored;
 
-    // Only stamp delivered_at on the actual transition into Delivered — not
-    // on every re-save while it's already sitting at Delivered, so the
-    // timestamp reflects the real first delivery moment.
+    // Only stamp delivered_at / flip payment status on the actual transition
+    // into Delivered — not on every re-save while it's already sitting there —
+    // so the timestamp reflects the real first delivery moment and we don't
+    // keep re-writing a value that's already correct.
     const updatePayload = { fulfillment_status: newStatus };
     if (newStatus === 'Delivered' && existingOrder.fulfillment_status !== 'Delivered') {
         updatePayload.delivered_at = new Date().toISOString();
+        updatePayload.payment_status = 'Paid';
     }
 
     const { data, error } = await db
@@ -1936,7 +1938,23 @@ async function updateFulfillmentStatus(orderId) {
         }
     }
 
-    alert(`Order #${orderId} fulfillment status updated to "${newStatus}" successfully!${stockNote}`);
+    const paymentNote = updatePayload.payment_status ? " Payment status set to Paid, and a matching payment was recorded in the Customer Ledger." : '';
+
+    // Keep the Customer Ledger's AR balance consistent with payment_status —
+    // marking an order Paid without a matching Credit entry would leave the
+    // ledger showing this customer as owing the full amount forever.
+    if (updatePayload.payment_status === 'Paid') {
+        const { error: payErr } = await db.from('customer_payments').insert([{
+            customer_phone: existingOrder.customer_phone,
+            amount: parseFloat(existingOrder.total_amount || 0),
+            payment_date: new Date().toISOString().split('T')[0],
+            payment_method: existingOrder.payment_method || 'Cash on Delivery',
+            note: `Auto-recorded on delivery for ${existingOrder.order_number || '#ORD-' + orderId}`
+        }]);
+        if (payErr) console.error("Could not auto-record customer payment:", payErr);
+    }
+
+    alert(`Order #${orderId} fulfillment status updated to "${newStatus}" successfully!${paymentNote}${stockNote}`);
     loadAdminOrders();
     loadStockHoldings();
 }
