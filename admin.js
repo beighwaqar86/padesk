@@ -1176,7 +1176,14 @@ async function loadCustomerLedger(phone, name) {
 
         (payments || []).forEach(p => {
             transactions.push({
-                date: p.payment_date,
+                // payment_date is a plain DATE (no time-of-day), while order
+                // created_at is a full timestamp. Parsed naively, a date-only
+                // string defaults to midnight — sorting it earlier than any
+                // same-day order, even one that happened hours before this
+                // payment was recorded. Anchoring to end-of-day instead means
+                // same-day invoices (which do have a real time) correctly
+                // sort first, matching the real-world order of events.
+                date: `${p.payment_date}T23:59:59`,
                 type: 'Payment',
                 ref: `${p.payment_method || 'Payment'}${p.note ? ' — ' + p.note : ''}`,
                 debit: 0,
