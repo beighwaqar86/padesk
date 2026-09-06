@@ -357,6 +357,9 @@ function switchAdminTab(tabName) {
         loadBusinessMaster();
         loadBrandMaster();
     }
+    if (tabName === 'ledger') {
+        loadLedgerProductList();
+    }
 }
 
 // --- PRODUCTS CRUD ---
@@ -780,6 +783,164 @@ function renderStockHoldings() {
             <td style="padding: 12px; text-align: right; color: #0baf65;">K ${totalInventoryCapital.toFixed(2)}</td>
         </tr>
     `;
+}
+
+// --- PRODUCT LEDGER / STATEMENT ---
+let ledgerProductsCache = [];
+let ledgerCustomerNameByPhone = {};
+
+async function loadLedgerProductList() {
+    try {
+        const { data: products, error } = await db.from('products').select('id, name, product_code').order('name');
+        if (error) throw error;
+        ledgerProductsCache = products || [];
+
+        const datalist = document.getElementById("ledger-product-datalist");
+        if (datalist) {
+            datalist.innerHTML = ledgerProductsCache.map(p =>
+                `<option value="${p.name}${p.product_code ? ' (' + p.product_code + ')' : ' (#' + p.id + ')'}">`
+            ).join('');
+        }
+    } catch (err) {
+        console.error("Could not load product list for ledger:", err);
+    }
+}
+
+function onLedgerProductSearchChange() {
+    const input = document.getElementById("ledger-product-search");
+    if (!input) return;
+    const typed = input.value.trim();
+
+    // Match on the "(code)" or "(#id)" suffix the datalist option carries, so
+    // picking an exact suggestion resolves unambiguously even with duplicate names.
+    const match = typed.match(/\(([^)]+)\)\s*$/);
+    let product = null;
+
+    if (match) {
+        const key = match[1];
+        product = ledgerProductsCache.find(p => p.product_code === key || `#${p.id}` === key);
+    }
+    if (!product) {
+        // Fallback: exact name match (covers typing without picking the suggestion)
+        product = ledgerProductsCache.find(p => p.name === typed);
+    }
+
+    if (product) {
+        loadProductLedger(product.id, product.name, product.product_code);
+    }
+}
+
+async function loadProductLedger(productId, productName, productCode) {
+    const resultsContainer = document.getElementById("ledger-results-container");
+    const tbody = document.getElementById("ledger-transactions-table");
+    const titleEl = document.getElementById("ledger-product-title");
+    const subtitleEl = document.getElementById("ledger-product-subtitle");
+    const reconEl = document.getElementById("ledger-reconciliation-note");
+    if (!resultsContainer || !tbody) return;
+
+    resultsContainer.style.display = "block";
+    titleEl.innerText = productName;
+    subtitleEl.innerText = productCode ? `Code: ${productCode}` : '';
+    tbody.innerHTML = `<tr><td colspan="11" style="padding:15px; text-align:center; color:#718096;">Loading ledger...</td></tr>`;
+    reconEl.innerHTML = '';
+
+    try {
+        // Build/reuse a phone → name lookup so Sale rows can show a customer name
+        if (Object.keys(ledgerCustomerNameByPhone).length === 0) {
+            const { data: customers } = await db.from('customers').select('phone_number, title, first_name, last_name');
+            (customers || []).forEach(c => {
+                ledgerCustomerNameByPhone[c.phone_number] = `${c.title || ''} ${c.first_name || ''} ${c.last_name || ''}`.trim();
+            });
+        }
+
+        const [{ data: purchases, error: purchErr }, { data: deliveredOrders, error: ordErr }, { data: liveProduct }] = await Promise.all([
+            db.from('purchases').select('*').eq('product_id', productId),
+            db.from('orders').select('*').eq('fulfillment_status', 'Delivered'),
+            db.from('products').select('stock_qty').eq('id', productId).single()
+        ]);
+        if (purchErr) throw purchErr;
+        if (ordErr) throw ordErr;
+
+        const transactions = [];
+
+        (purchases || []).forEach(p => {
+            const qty = p.qty_received || 0;
+            const unitCost = parseFloat(p.purchase_unit_cost || 0);
+            transactions.push({
+                date: p.purchase_date || p.invoice_date,
+                type: 'Purchase',
+                ref: p.invoice_ref || p.po_code || '-',
+                party: p.supplier_name || '-',
+                debitQty: qty,
+                debitValue: qty * unitCost,
+                creditQty: 0,
+                creditValue: 0
+            });
+        });
+
+        (deliveredOrders || []).forEach(o => {
+            const items = o.order_items_json || [];
+            items.filter(item => item.product && item.product.id === productId).forEach(item => {
+                const qty = item.qty || 0;
+                const invoicePrice = parseFloat(item.product.deal_price || item.product.price || 0);
+                transactions.push({
+                    date: o.created_at,
+                    type: 'Sale',
+                    ref: o.order_number || `#ORD-${o.id}`,
+                    party: ledgerCustomerNameByPhone[o.customer_phone] || o.customer_phone || '-',
+                    debitQty: 0,
+                    debitValue: 0,
+                    creditQty: qty,
+                    creditValue: qty * invoicePrice
+                });
+            });
+        });
+
+        transactions.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+        if (transactions.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="11" style="padding:15px; text-align:center; color:#718096;">No purchase or delivered-sale transactions found for this product yet.</td></tr>`;
+            reconEl.innerHTML = '';
+            return;
+        }
+
+        let balQty = 0, balValue = 0;
+        tbody.innerHTML = transactions.map((t, idx) => {
+            balQty += t.debitQty - t.creditQty;
+            balValue += t.debitValue - t.creditValue;
+            const typeColor = t.type === 'Purchase' ? '#0baf65' : '#3182ce';
+            return `
+                <tr style="border-bottom:1px solid #edf2f7;">
+                    <td style="padding:7px 6px;">${idx + 1}</td>
+                    <td style="padding:7px 6px; white-space:nowrap;">${t.date ? new Date(t.date).toLocaleDateString() : '-'}</td>
+                    <td style="padding:7px 6px;"><span style="color:${typeColor}; font-weight:bold;">${t.type}</span></td>
+                    <td style="padding:7px 6px;">${t.ref}</td>
+                    <td style="padding:7px 6px;">${t.party}</td>
+                    <td style="padding:7px 6px; text-align:right;">${t.debitQty || ''}</td>
+                    <td style="padding:7px 6px; text-align:right;">${t.debitValue ? 'K ' + t.debitValue.toFixed(2) : ''}</td>
+                    <td style="padding:7px 6px; text-align:right;">${t.creditQty || ''}</td>
+                    <td style="padding:7px 6px; text-align:right;">${t.creditValue ? 'K ' + t.creditValue.toFixed(2) : ''}</td>
+                    <td style="padding:7px 6px; text-align:right; font-weight:bold;">${balQty}</td>
+                    <td style="padding:7px 6px; text-align:right; font-weight:bold;">K ${balValue.toFixed(2)}</td>
+                </tr>
+            `;
+        }).join('');
+
+        const liveStock = (liveProduct && liveProduct.stock_qty) || 0;
+        const mismatch = liveStock !== balQty;
+        reconEl.innerHTML = `
+            <div style="background: ${mismatch ? '#fffaf0' : '#e6f7f0'}; border: 1px solid ${mismatch ? '#f6d78e' : '#b2f5ea'}; border-radius: 8px; padding: 12px 16px; font-size: 0.82rem; color: ${mismatch ? '#975a16' : '#0baf65'};">
+                <strong>Ledger Balance Qty:</strong> ${balQty} &nbsp;|&nbsp; <strong>Live Stock Qty:</strong> ${liveStock}
+                ${mismatch
+                    ? `<br><span style="color:#975a16;">These differ — usually because this product has orders placed but not yet marked <strong>Delivered</strong> (stock was already deducted at checkout, but this ledger only records sales once delivered). If there are no such pending orders for this product, the difference may indicate a manual stock edit outside the normal Purchases flow.</span>`
+                    : `<br><span>Ledger and live stock agree.</span>`
+                }
+            </div>
+        `;
+    } catch (err) {
+        console.error("Error loading product ledger:", err);
+        tbody.innerHTML = `<tr><td colspan="11" style="padding:15px; text-align:center; color:red;">Failed to load ledger data.</td></tr>`;
+    }
 }
 
 // --- BI ANALYTICS DASHBOARD ---
