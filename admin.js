@@ -1175,15 +1175,16 @@ async function loadCustomerLedger(phone, name) {
         });
 
         (payments || []).forEach(p => {
+            // payment_date only has day-level precision (no time-of-day), so two
+            // payments recorded minutes apart on the same day, or a payment and
+            // a same-day invoice, can't be interleaved correctly using it alone.
+            // Combining the user-specified DATE (authoritative — respects a
+            // deliberately backdated entry) with the actual TIME-OF-DAY from
+            // created_at (when the record was really inserted) gives correct
+            // same-day ordering without losing that backdating ability.
+            const timeOfDay = p.created_at ? p.created_at.split('T')[1] : '12:00:00';
             transactions.push({
-                // payment_date is a plain DATE (no time-of-day), while order
-                // created_at is a full timestamp. Parsed naively, a date-only
-                // string defaults to midnight — sorting it earlier than any
-                // same-day order, even one that happened hours before this
-                // payment was recorded. Anchoring to end-of-day instead means
-                // same-day invoices (which do have a real time) correctly
-                // sort first, matching the real-world order of events.
-                date: `${p.payment_date}T23:59:59`,
+                date: `${p.payment_date}T${timeOfDay}`,
                 type: 'Payment',
                 ref: `${p.payment_method || 'Payment'}${p.note ? ' — ' + p.note : ''}`,
                 debit: 0,
