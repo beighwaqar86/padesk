@@ -335,9 +335,18 @@ function switchAdminTab(tabName) {
     if (targetTab) targetTab.style.display = 'block';
     if (targetBtn) targetBtn.classList.add('active');
 
-    // Trigger data loading based on active tab
+    loadDataForTab(tabName);
+}
+
+// Re-fetches whatever data belongs to a given tab. Shared by switchAdminTab
+// (loading a tab you just clicked into) and refreshCurrentTab (re-loading the
+// tab you're already on, without navigating away from it).
+function loadDataForTab(tabName) {
     if (tabName === 'dashboard') {
         loadBIDashboard();
+    }
+    if (tabName === 'products') {
+        loadAdminProducts();
     }
     if (tabName === 'pnl') {
         loadPnLReport();
@@ -349,6 +358,12 @@ function switchAdminTab(tabName) {
     if (tabName === 'stock') {
         loadStockHoldings();
     }
+    if (tabName === 'banners') {
+        loadAdminBanners(); // also refreshes saved-combo performance underneath it
+    }
+    if (tabName === 'fulfillment') {
+        loadAdminOrders();
+    }
     if (tabName === 'notifications') {
         loadStockRequests();
         loadReminderOptIns();
@@ -358,7 +373,27 @@ function switchAdminTab(tabName) {
         loadBrandMaster();
     }
     if (tabName === 'ledger') {
-        loadLedgerProductList();
+        if (ledgerCurrentProduct) {
+            loadProductLedger(ledgerCurrentProduct.id, ledgerCurrentProduct.name, ledgerCurrentProduct.code);
+        } else {
+            loadLedgerProductList();
+        }
+    }
+}
+
+// Refreshes the tab currently on screen in place — no navigation, no losing
+// whatever you were looking at (e.g. a searched-up product in the ledger).
+function refreshCurrentTab() {
+    const activeBtn = document.querySelector('.admin-tab-btn.active');
+    if (!activeBtn) return;
+    const tabName = activeBtn.id.replace('tab-btn-', '');
+    loadDataForTab(tabName);
+
+    const refreshBtn = document.querySelector('[onclick="refreshCurrentTab()"]');
+    if (refreshBtn) {
+        const originalText = refreshBtn.innerText;
+        refreshBtn.innerText = '✓ Refreshed';
+        setTimeout(() => { refreshBtn.innerText = originalText; }, 1200);
     }
 }
 
@@ -789,6 +824,7 @@ function renderStockHoldings() {
 let ledgerProductsCache = [];
 let ledgerCustomerNameByPhone = {};
 let ledgerOpenOrdersCache = [];
+let ledgerCurrentProduct = null; // { id, name, code } — lets refreshCurrentTab() restore the view
 
 function toggleLedgerOpenOrdersDetail() {
     const detailEl = document.getElementById("ledger-open-orders-detail");
@@ -872,6 +908,8 @@ function onLedgerProductSearchChange() {
 }
 
 async function loadProductLedger(productId, productName, productCode) {
+    ledgerCurrentProduct = { id: productId, name: productName, code: productCode };
+
     const resultsContainer = document.getElementById("ledger-results-container");
     const tbody = document.getElementById("ledger-transactions-table");
     const titleEl = document.getElementById("ledger-product-title");
