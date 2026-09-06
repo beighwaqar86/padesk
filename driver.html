@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+    <title>PaDesk Driver</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --primary: #0baf65;
+            --primary-dark: #088a4f;
+            --dark: #1a202c;
+            --gray-bg: #f7fafc;
+            --border: #e2e8f0;
+            --muted: #718096;
+            --danger: #e53e3e;
+            --amber: #975a16;
+        }
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: var(--gray-bg);
+            color: var(--dark);
+            margin: 0;
+            padding: 0 0 40px;
+        }
+        header {
+            background: var(--dark);
+            color: white;
+            padding: 16px 18px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        header h1 {
+            font-size: 1.1rem;
+            margin: 0;
+            font-weight: 800;
+        }
+        header .count-pill {
+            background: var(--primary);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 700;
+        }
+        #refresh-btn {
+            background: rgba(255,255,255,0.12);
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            margin-left: 8px;
+        }
+        main {
+            max-width: 480px;
+            margin: 0 auto;
+            padding: 16px;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--muted);
+        }
+        .empty-state .emoji { font-size: 2.5rem; margin-bottom: 12px; }
+        .order-card {
+            background: white;
+            border-radius: 14px;
+            border: 1px solid var(--border);
+            padding: 16px;
+            margin-bottom: 14px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        .order-card-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 10px;
+        }
+        .order-ref {
+            font-size: 0.72rem;
+            font-weight: 700;
+            color: var(--muted);
+            background: var(--gray-bg);
+            padding: 3px 8px;
+            border-radius: 5px;
+        }
+        .order-status {
+            font-size: 0.7rem;
+            font-weight: 700;
+            color: var(--primary-dark);
+        }
+        .customer-name {
+            font-size: 1.05rem;
+            font-weight: 800;
+            margin: 0 0 2px;
+        }
+        .customer-phone {
+            color: var(--primary-dark);
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+        .location-row {
+            font-size: 0.85rem;
+            color: var(--muted);
+            margin-top: 6px;
+        }
+        .items-list {
+            margin: 12px 0;
+            padding: 10px 12px;
+            background: var(--gray-bg);
+            border-radius: 8px;
+            font-size: 0.82rem;
+        }
+        .items-list div {
+            display: flex;
+            justify-content: space-between;
+            padding: 2px 0;
+        }
+        .due-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 12px 0;
+            padding-top: 10px;
+            border-top: 1px dashed var(--border);
+        }
+        .due-label { font-size: 0.85rem; color: var(--muted); font-weight: 600; }
+        .due-amount { font-size: 1.4rem; font-weight: 800; color: var(--dark); }
+        .payment-badge {
+            display: inline-block;
+            font-size: 0.7rem;
+            font-weight: 700;
+            color: var(--amber);
+            background: #fffaf0;
+            padding: 2px 8px;
+            border-radius: 5px;
+            margin-top: 4px;
+        }
+        .btn-delivered {
+            width: 100%;
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 16px;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 800;
+            cursor: pointer;
+            margin-top: 4px;
+        }
+        .btn-delivered:active { background: var(--primary-dark); }
+        .btn-issue {
+            width: 100%;
+            background: white;
+            color: var(--muted);
+            border: 1px solid var(--border);
+            padding: 12px;
+            border-radius: 10px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            cursor: pointer;
+            margin-top: 8px;
+        }
+        .issue-panel {
+            display: none;
+            margin-top: 10px;
+            padding: 14px;
+            background: #fffaf0;
+            border: 1px solid #f6d78e;
+            border-radius: 10px;
+        }
+        .issue-panel.open { display: block; }
+        .issue-panel p {
+            font-size: 0.8rem;
+            color: var(--amber);
+            margin: 0 0 10px;
+            font-weight: 600;
+        }
+        .issue-choice-btn {
+            width: 100%;
+            background: white;
+            border: 1px solid #f6d78e;
+            color: var(--amber);
+            padding: 10px;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 0.82rem;
+            cursor: pointer;
+            margin-bottom: 8px;
+        }
+        .partial-form {
+            display: none;
+            margin-top: 10px;
+        }
+        .partial-form.open { display: block; }
+        .partial-form input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #cbd5e0;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            box-sizing: border-box;
+            margin-bottom: 8px;
+        }
+        .partial-form button {
+            width: 100%;
+            background: var(--amber);
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 0.85rem;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>🚚 PaDesk Driver</h1>
+        <div style="display:flex; align-items:center;">
+            <span class="count-pill" id="pending-count">0</span>
+            <button id="refresh-btn" onclick="loadDeliveries()">↻ Refresh</button>
+        </div>
+    </header>
+
+    <main id="orders-container">
+        <div class="empty-state"><div class="emoji">⏳</div>Loading deliveries...</div>
+    </main>
+
+    <script src="driver.js"></script>
+</body>
+</html>
