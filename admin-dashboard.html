@@ -27,6 +27,7 @@
             <button type="button" onclick="switchAdminTab('banners')" id="tab-btn-banners" style="background: #edf2f7; color: #4a5568; border: none; padding: 10px 16px; border-radius: 8px; font-weight: bold; cursor: pointer;">⚡ Ready-Made Combos</button>
             <button type="button" onclick="switchAdminTab('fulfillment')" id="tab-btn-fulfillment" style="background: #edf2f7; color: #4a5568; border: none; padding: 10px 16px; border-radius: 8px; font-weight: bold; cursor: pointer;">🚚 Order Fulfillment</button>
             <button type="button" onclick="switchAdminTab('notifications')" id="tab-btn-notifications" style="background: #edf2f7; color: #4a5568; border: none; padding: 10px 16px; border-radius: 8px; font-weight: bold; cursor: pointer;">🔔 Notifications</button>
+            <button type="button" onclick="switchAdminTab('lists')" id="tab-btn-lists" style="background: #edf2f7; color: #4a5568; border: none; padding: 10px 16px; border-radius: 8px; font-weight: bold; cursor: pointer;">🗂️ Manage Lists</button>
         </div>
 
         <!-- TAB 0: BI DASHBOARD -->
@@ -91,23 +92,23 @@
 
                     <div>
                         <label style="font-size: 0.75rem; font-weight: 700; color: #4a5568;">BUSINESS *</label>
-                        <select id="p-business" required style="width: 100%; padding: 8px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 0.85rem;">
+                        <select id="p-business" required style="width: 100%; padding: 8px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 0.85rem;" onchange="onBusinessMasterFieldChange('business')">
                             <option value="">-- Select Business --</option>
-                            <option value="Groceries">Groceries</option>
-                            <option value="Retail">Retail</option>
-                            <option value="Electronics">Electronics</option>
-                            <option value="Beauty">Beauty</option>
                         </select>
                     </div>
 
                     <div>
                         <label style="font-size: 0.75rem; font-weight: 700; color: #4a5568;">CATEGORY *</label>
-                        <input type="text" id="p-category" placeholder="e.g. Food Cupboard" required style="width: 100%; padding: 8px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 0.85rem; box-sizing: border-box;">
+                        <select id="p-category" required style="width: 100%; padding: 8px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 0.85rem;" onchange="onBusinessMasterFieldChange('category')">
+                            <option value="">-- Select Category --</option>
+                        </select>
                     </div>
 
                     <div>
                         <label style="font-size: 0.75rem; font-weight: 700; color: #4a5568;">SUB-CATEGORY</label>
-                        <input type="text" id="p-subcategory" placeholder="e.g. Maize Meal" style="width: 100%; padding: 8px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 0.85rem; box-sizing: border-box;">
+                        <select id="p-subcategory" style="width: 100%; padding: 8px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 0.85rem;" onchange="onBusinessMasterFieldChange('subcategory')">
+                            <option value="">-- Select Sub-Category --</option>
+                        </select>
                     </div>
                     
                     <!-- NEW: Cost Price -->
@@ -136,7 +137,9 @@
 
                     <div>
                         <label style="font-size: 0.75rem; font-weight: 700; color: #4a5568;">BRAND</label>
-                        <input type="text" id="p-brand" placeholder="e.g. Sunbird" style="width: 100%; padding: 8px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 0.85rem; box-sizing: border-box;">
+                        <select id="p-brand" style="width: 100%; padding: 8px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 0.85rem;" onchange="onBrandMasterFieldChange()">
+                            <option value="">-- Select Brand --</option>
+                        </select>
                     </div>
 
                     <div>
@@ -372,6 +375,72 @@
                         </thead>
                         <tbody id="admin-reminder-optins-table">
                             <tr><td colspan="3" style="padding: 15px; text-align: center; color: #718096;">Loading opt-ins...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 7: MANAGE LISTS (Business/Category/Sub-Category & Brand master data) -->
+        <div id="admin-tab-lists" class="admin-tab-content" style="display: none;">
+            <h3 style="margin-bottom: 4px;">🗂️ Manage Business, Category & Brand Lists</h3>
+            <p style="color: #718096; font-size: 0.85rem; margin-top: 0;">These lists control what shows up in the Business / Category / Sub-Category / Brand dropdowns when adding a product. Deleting an entry here doesn't change any existing products — it only removes it from the dropdown for future use.</p>
+
+            <div style="background: white; padding: 20px; border-radius: 10px; border: 1px solid #e2e8f0; margin-bottom: 24px;">
+                <h4 style="margin-top: 0; color: #1a202c; font-size: 1rem;">🏢 Business / Category / Sub-Category</h4>
+                <form onsubmit="addBusinessMasterRow(event)" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)) auto; gap: 10px; align-items: flex-end; margin-bottom: 16px;">
+                    <div>
+                        <label style="font-size: 0.72rem; font-weight: 700; color: #4a5568;">BUSINESS</label>
+                        <input type="text" id="new-bm-business" placeholder="e.g. Confectionary" required style="width: 100%; padding: 8px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 0.85rem; box-sizing: border-box;">
+                    </div>
+                    <div>
+                        <label style="font-size: 0.72rem; font-weight: 700; color: #4a5568;">CATEGORY</label>
+                        <input type="text" id="new-bm-category" placeholder="e.g. Confectionary" required style="width: 100%; padding: 8px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 0.85rem; box-sizing: border-box;">
+                    </div>
+                    <div>
+                        <label style="font-size: 0.72rem; font-weight: 700; color: #4a5568;">SUB-CATEGORY</label>
+                        <input type="text" id="new-bm-subcategory" placeholder="e.g. Candy" required style="width: 100%; padding: 8px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 0.85rem; box-sizing: border-box;">
+                    </div>
+                    <button type="submit" style="background: #0baf65; color: white; border: none; padding: 9px 16px; border-radius: 6px; font-weight: bold; font-size: 0.82rem; cursor: pointer; white-space: nowrap;">+ Add</button>
+                </form>
+
+                <div style="max-height: 340px; overflow-y: auto; border: 1px solid #edf2f7; border-radius: 8px;">
+                    <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem;">
+                        <thead style="position: sticky; top: 0;">
+                            <tr style="background: #f7fafc; border-bottom: 2px solid #e2e8f0; color: #4a5568;">
+                                <th style="padding: 8px 10px;">Business</th>
+                                <th style="padding: 8px 10px;">Category</th>
+                                <th style="padding: 8px 10px;">Sub-Category</th>
+                                <th style="padding: 8px 10px; text-align: center;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-business-master-table">
+                            <tr><td colspan="4" style="padding: 15px; text-align: center; color: #718096;">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div style="background: white; padding: 20px; border-radius: 10px; border: 1px solid #e2e8f0;">
+                <h4 style="margin-top: 0; color: #1a202c; font-size: 1rem;">🏷️ Brands</h4>
+                <form onsubmit="addBrandMasterRow(event)" style="display: flex; gap: 10px; align-items: flex-end; margin-bottom: 16px; max-width: 420px;">
+                    <div style="flex: 1;">
+                        <label style="font-size: 0.72rem; font-weight: 700; color: #4a5568;">BRAND NAME</label>
+                        <input type="text" id="new-brand-name" placeholder="e.g. Aer" required style="width: 100%; padding: 8px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 0.85rem; box-sizing: border-box;">
+                    </div>
+                    <button type="submit" style="background: #0baf65; color: white; border: none; padding: 9px 16px; border-radius: 6px; font-weight: bold; font-size: 0.82rem; cursor: pointer; white-space: nowrap;">+ Add</button>
+                </form>
+
+                <div style="max-height: 300px; overflow-y: auto; border: 1px solid #edf2f7; border-radius: 8px;">
+                    <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem;">
+                        <thead style="position: sticky; top: 0;">
+                            <tr style="background: #f7fafc; border-bottom: 2px solid #e2e8f0; color: #4a5568;">
+                                <th style="padding: 8px 10px;">Brand</th>
+                                <th style="padding: 8px 10px; text-align: center;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-brand-master-table">
+                            <tr><td colspan="2" style="padding: 15px; text-align: center; color: #718096;">Loading...</td></tr>
                         </tbody>
                     </table>
                 </div>
