@@ -510,6 +510,12 @@ async function cancelOrder(orderId) {
             }
         }
 
+        // Mark this order's stock as restored so it's never restored a second
+        // time, even if an admin later flips its status around.
+        if (restoreFailures.length === 0) {
+            await db.from('orders').update({ stock_restored: true }).eq('id', orderId);
+        }
+
         alert(`Order ${orderLabel} has been cancelled.` + (restoreFailures.length > 0 ? `\n\nNote: stock for ${restoreFailures.join(", ")} could not be automatically restored — please adjust it manually if needed.` : ''));
         const phone = localStorage.getItem("padesk_phone");
         if (phone) loadAccountHistory(phone);
