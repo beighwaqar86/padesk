@@ -17,6 +17,9 @@ let slideInterval;
 let currentFilteredProducts = []; // the active filtered/sorted list, for "Load More" paging
 let productsRenderedCount = 0;
 let currentSort = "default";
+let bannersById = {};   // for combo conversion tracking
+let combosById = {};    // for combo conversion tracking
+let cartComboSources = new Set(); // "banner:12" / "combo:7" — which combos contributed to the current cart
 
 // Effective selling price for a product (deal price wins if set)
 function getPrice(product) {
@@ -312,6 +315,7 @@ async function loadCustomerCustomCombos(phone) {
     if (sliderContainer && sectionContainer) {
         sectionContainer.style.display = "block";
         sliderContainer.innerHTML = combos.map(c => {
+            combosById[c.id] = c;
             const encodedItems = encodeURIComponent(JSON.stringify(c.items_json));
             return `
                 <div class="past-card" style="min-width: 180px; background: #e6f7f0; border-color: #b2f5ea;">
@@ -320,7 +324,7 @@ async function loadCustomerCustomCombos(phone) {
                         <h5 style="margin: 4px 0; font-size: 0.85rem;">${c.combo_name}</h5>
                         <small style="color: #718096; font-size: 0.7rem;">${(c.items_json || []).length} items included</small>
                     </div>
-                    <button type="button" onclick="addBannerComboToCart('${encodedItems}', '${c.combo_name}')" class="btn-add" style="margin-top: 8px; padding: 4px 8px; font-size: 0.75rem; background: #0baf65;">+ Add Combo</button>
+                    <button type="button" onclick="addBannerComboToCart('${encodedItems}', '${c.combo_name}', 'combo', ${c.id})" class="btn-add" style="margin-top: 8px; padding: 4px 8px; font-size: 0.75rem; background: #0baf65;">+ Add Combo</button>
                 </div>
             `;
         }).join('');
@@ -575,13 +579,14 @@ async function loadBanners() {
 
     if (container) {
         container.innerHTML = banners.map(b => {
+            bannersById[b.id] = b;
             const encodedItems = b.items_json ? encodeURIComponent(JSON.stringify(b.items_json)) : '';
             const comboTitle = b.title || 'Combo';
 
             return `
                 <div class="banner-card" style="background-image: url('${b.image_url}'); position: relative;">
                     ${b.items_json ? `
-                        <button type="button" onclick="addBannerComboToCart('${encodedItems}', '${comboTitle}')" class="btn-add-combo" style="position: absolute; top: 10px; right: 10px; background: #0baf65; color: white; border: none; padding: 6px 12px; border-radius: 8px; font-weight: 800; font-size: 0.75rem; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.3); z-index: 5;">
+                        <button type="button" onclick="addBannerComboToCart('${encodedItems}', '${comboTitle}', 'banner', ${b.id})" class="btn-add-combo" style="position: absolute; top: 10px; right: 10px; background: #0baf65; color: white; border: none; padding: 6px 12px; border-radius: 8px; font-weight: 800; font-size: 0.75rem; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.3); z-index: 5;">
                             + Add Combo
                         </button>
                     ` : ''}
@@ -605,7 +610,7 @@ async function loadBanners() {
     }
 }
 
-function addBannerComboToCart(encodedItems, comboTitle) {
+function addBannerComboToCart(encodedItems, comboTitle, sourceType, sourceId) {
     try {
         const decodedString = decodeURIComponent(encodedItems);
         const comboItems = JSON.parse(decodedString);
@@ -635,12 +640,58 @@ function addBannerComboToCart(encodedItems, comboTitle) {
             }
         });
 
+        if (sourceType && sourceId) {
+            trackComboAdded(sourceType, sourceId);
+            cartComboSources.add(`${sourceType}:${sourceId}`);
+        }
+
         updateCartUI();
         alert(`⚡ "${comboTitle}" added to your cart successfully! Check your minimum combo criteria below.`);
     } catch (e) {
         console.error("Error adding combo:", e);
         alert("Could not process this combo items list.");
     }
+}
+
+// Fire-and-forget: increments times_added for a banner or saved combo.
+// Never blocks the UI and never surfaces an error to the customer — this is
+// an internal analytics counter, not something that should interrupt shopping.
+async function trackComboAdded(sourceType, sourceId) {
+    try {
+        const table = sourceType === 'banner' ? 'banners' : 'customer_combos';
+        const cache = sourceType === 'banner' ? bannersById : combosById;
+        const current = cache[sourceId];
+        const newCount = ((current && current.times_added) || 0) + 1;
+
+        await db.from(table).update({ times_added: newCount }).eq('id', sourceId);
+        if (current) current.times_added = newCount;
+    } catch (err) {
+        console.warn("Could not record combo-added tracking (non-critical):", err);
+    }
+}
+
+// Fire-and-forget: increments times_ordered for every combo that contributed
+// items to a cart which just became a successful order. Called once per
+// checkout, after the order is confirmed.
+async function trackComboOrdersConverted() {
+    if (cartComboSources.size === 0) return;
+
+    for (const key of cartComboSources) {
+        const [sourceType, sourceIdStr] = key.split(':');
+        const sourceId = parseInt(sourceIdStr, 10);
+        try {
+            const table = sourceType === 'banner' ? 'banners' : 'customer_combos';
+            const cache = sourceType === 'banner' ? bannersById : combosById;
+            const current = cache[sourceId];
+            const newCount = ((current && current.times_ordered) || 0) + 1;
+
+            await db.from(table).update({ times_ordered: newCount }).eq('id', sourceId);
+            if (current) current.times_ordered = newCount;
+        } catch (err) {
+            console.warn("Could not record combo-ordered tracking (non-critical):", err);
+        }
+    }
+    cartComboSources.clear();
 }
 
 function startAutoSlide(totalSlides) {
@@ -1378,6 +1429,7 @@ async function executeFinalOrderSubmission() {
         cart = {};
         updateCartUI();
         autoPopulateSavedCustomer();
+        trackComboOrdersConverted(); // fire-and-forget, doesn't block the confirmation screen
         
         const displayOrderNo = newOrder && newOrder.order_number ? newOrder.order_number : "Successfully";
 
