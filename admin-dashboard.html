@@ -145,6 +145,7 @@
             <button type="button" onclick="switchAdminTab('fulfillment')" id="tab-btn-fulfillment" class="admin-tab-btn">🚚 Order Fulfillment</button>
             <button type="button" onclick="switchAdminTab('notifications')" id="tab-btn-notifications" class="admin-tab-btn">🔔 Notifications</button>
             <button type="button" onclick="switchAdminTab('lists')" id="tab-btn-lists" class="admin-tab-btn">🗂️ Manage Lists</button>
+            <button type="button" onclick="switchAdminTab('ledger')" id="tab-btn-ledger" class="admin-tab-btn">📒 Product Ledger</button>
         </div>
 
         <!-- TAB 0: BI DASHBOARD -->
@@ -566,6 +567,51 @@
                         </tbody>
                     </table>
                 </div>
+            </div>
+        </div>
+
+        <!-- TAB 8: PRODUCT LEDGER -->
+        <div id="admin-tab-ledger" class="admin-tab-content" style="display: none;">
+            <h3 style="margin-bottom: 4px;">📒 Product Ledger / Statement</h3>
+            <p style="color: #718096; font-size: 0.85rem; margin-top: 0;">Every purchase (Debit, at cost) and every <strong>delivered</strong> sale (Credit, at invoice price) for a single product, with a running balance. Orders that are placed but not yet marked Delivered do not appear here yet — see the reconciliation note below the table.</p>
+
+            <div class="admin-card" style="margin-bottom: 20px;">
+                <label style="font-size: 0.75rem; font-weight: 700; color: #4a5568;">SEARCH PRODUCT</label>
+                <input type="text" id="ledger-product-search" list="ledger-product-datalist" placeholder="Type a product name or code..." oninput="onLedgerProductSearchChange()" style="width: 100%; max-width: 420px; padding: 10px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 0.9rem; box-sizing: border-box; margin-top: 6px;">
+                <datalist id="ledger-product-datalist"></datalist>
+            </div>
+
+            <div id="ledger-results-container" style="display: none;">
+                <div class="admin-card" style="margin-bottom: 16px;">
+                    <h4 id="ledger-product-title" style="margin: 0 0 4px; color: #1a202c;"></h4>
+                    <small id="ledger-product-subtitle" style="color: #718096;"></small>
+                </div>
+
+                <div class="admin-card">
+                    <div style="overflow-x: auto;">
+                        <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.82rem;">
+                            <thead>
+                                <tr style="background: #f7fafc; border-bottom: 2px solid #e2e8f0; color: #4a5568;">
+                                    <th style="padding: 8px 6px;">S.No</th>
+                                    <th style="padding: 8px 6px;">Date</th>
+                                    <th style="padding: 8px 6px;">Type</th>
+                                    <th style="padding: 8px 6px;">Ref No.</th>
+                                    <th style="padding: 8px 6px;">Party Name</th>
+                                    <th style="padding: 8px 6px; text-align: right;">Debit Qty</th>
+                                    <th style="padding: 8px 6px; text-align: right;">Debit Value</th>
+                                    <th style="padding: 8px 6px; text-align: right;">Credit Qty</th>
+                                    <th style="padding: 8px 6px; text-align: right;">Credit Value</th>
+                                    <th style="padding: 8px 6px; text-align: right;">Bal. Qty</th>
+                                    <th style="padding: 8px 6px; text-align: right;">Bal. Value</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ledger-transactions-table">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div id="ledger-reconciliation-note" style="margin-top: 16px;"></div>
             </div>
         </div>
 
