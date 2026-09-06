@@ -980,7 +980,7 @@ async function loadProductLedger(productId, productName, productCode) {
                 const qty = item.qty || 0;
                 const invoicePrice = parseFloat(item.product.deal_price || item.product.price || 0);
                 transactions.push({
-                    date: o.created_at,
+                    date: o.delivered_at || o.created_at,
                     type: 'Sale',
                     ref: o.order_number || `#ORD-${o.id}`,
                     party: ledgerCustomerNameByPhone[o.customer_phone] || o.customer_phone || '-',
@@ -1165,7 +1165,7 @@ async function loadCustomerLedger(phone, name) {
 
         (deliveredOrders || []).forEach(o => {
             transactions.push({
-                date: o.created_at,
+                date: o.delivered_at || o.created_at,
                 type: 'Invoice',
                 ref: o.order_number || `#ORD-${o.id}`,
                 debit: parseFloat(o.total_amount || 0),
@@ -1382,7 +1382,7 @@ async function loadStockMovementReport(from, to, label) {
         });
 
         (allDeliveredOrders || []).forEach(o => {
-            const date = new Date(o.created_at);
+            const date = new Date(o.delivered_at || o.created_at);
             const items = o.order_items_json || [];
             items.forEach(item => {
                 const pid = item.product && item.product.id;
@@ -1870,9 +1870,17 @@ async function updateFulfillmentStatus(orderId) {
     // Cancelled → Delivered would otherwise create).
     const needsRededuct = !isNowCancelled && wasCancelled && existingOrder.stock_restored;
 
+    // Only stamp delivered_at on the actual transition into Delivered — not
+    // on every re-save while it's already sitting at Delivered, so the
+    // timestamp reflects the real first delivery moment.
+    const updatePayload = { fulfillment_status: newStatus };
+    if (newStatus === 'Delivered' && existingOrder.fulfillment_status !== 'Delivered') {
+        updatePayload.delivered_at = new Date().toISOString();
+    }
+
     const { data, error } = await db
         .from('orders')
-        .update({ fulfillment_status: newStatus })
+        .update(updatePayload)
         .eq('id', orderId)
         .select();
     
