@@ -788,6 +788,47 @@ function renderStockHoldings() {
 // --- PRODUCT LEDGER / STATEMENT ---
 let ledgerProductsCache = [];
 let ledgerCustomerNameByPhone = {};
+let ledgerOpenOrdersCache = [];
+
+function toggleLedgerOpenOrdersDetail() {
+    const detailEl = document.getElementById("ledger-open-orders-detail");
+    if (!detailEl) return;
+
+    const isOpen = detailEl.style.display !== "none";
+    if (isOpen) {
+        detailEl.style.display = "none";
+        return;
+    }
+
+    detailEl.innerHTML = `
+        <div style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 16px;">
+            <div style="font-weight:700; font-size:0.8rem; color:#4a5568; margin-bottom:8px;">Orders contributing to Open Order Qty:</div>
+            <table style="width:100%; border-collapse:collapse; text-align:left; font-size:0.8rem;">
+                <thead>
+                    <tr style="border-bottom:1px solid #edf2f7; color:#718096;">
+                        <th style="padding:6px;">Order No.</th>
+                        <th style="padding:6px;">Date</th>
+                        <th style="padding:6px;">Status</th>
+                        <th style="padding:6px;">Customer</th>
+                        <th style="padding:6px; text-align:right;">Qty</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${ledgerOpenOrdersCache.map(o => `
+                        <tr style="border-bottom:1px solid #f7fafc;">
+                            <td style="padding:6px;">${o.ref}</td>
+                            <td style="padding:6px;">${o.date ? new Date(o.date).toLocaleDateString() : '-'}</td>
+                            <td style="padding:6px;"><span style="color:#3182ce; font-weight:600;">${o.status}</span></td>
+                            <td style="padding:6px;">${o.party}</td>
+                            <td style="padding:6px; text-align:right; font-weight:600;">${o.qty}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+    detailEl.style.display = "block";
+}
 
 async function loadLedgerProductList() {
     try {
@@ -853,13 +894,15 @@ async function loadProductLedger(productId, productName, productCode) {
             });
         }
 
-        const [{ data: purchases, error: purchErr }, { data: deliveredOrders, error: ordErr }, { data: liveProduct }] = await Promise.all([
+        const [{ data: purchases, error: purchErr }, { data: deliveredOrders, error: ordErr }, { data: openOrdersRaw, error: openErr }, { data: liveProduct }] = await Promise.all([
             db.from('purchases').select('*').eq('product_id', productId),
             db.from('orders').select('*').eq('fulfillment_status', 'Delivered'),
+            db.from('orders').select('*').neq('fulfillment_status', 'Delivered').neq('fulfillment_status', 'Cancelled'),
             db.from('products').select('stock_qty').eq('id', productId).single()
         ]);
         if (purchErr) throw purchErr;
         if (ordErr) throw ordErr;
+        if (openErr) throw openErr;
 
         const transactions = [];
 
@@ -896,6 +939,25 @@ async function loadProductLedger(productId, productName, productCode) {
             });
         });
 
+        // Orders still in Placed/Aggregating/Dispatched — their stock is already
+        // deducted from live stock_qty, but they haven't been recorded as a Sale
+        // in this ledger yet (that only happens at Delivered).
+        const openOrdersForProduct = [];
+        (openOrdersRaw || []).forEach(o => {
+            const items = o.order_items_json || [];
+            items.filter(item => item.product && item.product.id === productId).forEach(item => {
+                openOrdersForProduct.push({
+                    date: o.created_at,
+                    ref: o.order_number || `#ORD-${o.id}`,
+                    party: ledgerCustomerNameByPhone[o.customer_phone] || o.customer_phone || '-',
+                    status: o.fulfillment_status,
+                    qty: item.qty || 0
+                });
+            });
+        });
+        const openOrderQty = openOrdersForProduct.reduce((sum, o) => sum + o.qty, 0);
+        ledgerOpenOrdersCache = openOrdersForProduct; // for the drill-down click
+
         transactions.sort((a, b) => new Date(a.date) - new Date(b.date));
 
         if (transactions.length === 0) {
@@ -928,14 +990,28 @@ async function loadProductLedger(productId, productName, productCode) {
 
         const liveStock = (liveProduct && liveProduct.stock_qty) || 0;
         const mismatch = liveStock !== balQty;
+        const expectedFromOpenOrders = balQty - openOrderQty;
+        const stillUnexplained = expectedFromOpenOrders !== liveStock;
+
         reconEl.innerHTML = `
             <div style="background: ${mismatch ? '#fffaf0' : '#e6f7f0'}; border: 1px solid ${mismatch ? '#f6d78e' : '#b2f5ea'}; border-radius: 8px; padding: 12px 16px; font-size: 0.82rem; color: ${mismatch ? '#975a16' : '#0baf65'};">
-                <strong>Ledger Balance Qty:</strong> ${balQty} &nbsp;|&nbsp; <strong>Live Stock Qty:</strong> ${liveStock}
-                ${mismatch
-                    ? `<br><span style="color:#975a16;">These differ — usually because this product has orders placed but not yet marked <strong>Delivered</strong> (stock was already deducted at checkout, but this ledger only records sales once delivered). If there are no such pending orders for this product, the difference may indicate a manual stock edit outside the normal Purchases flow.</span>`
-                    : `<br><span>Ledger and live stock agree.</span>`
-                }
+                <strong>Ledger Balance Qty:</strong> ${balQty}
+                &nbsp;|&nbsp;
+                <span style="${openOrderQty > 0 ? 'text-decoration: underline; cursor: pointer;' : ''}" ${openOrderQty > 0 ? 'onclick="toggleLedgerOpenOrdersDetail()"' : ''}>
+                    <strong>Open Order Qty:</strong> ${openOrderQty}${openOrderQty > 0 ? ' 🔍' : ''}
+                </span>
+                &nbsp;|&nbsp;
+                <strong>Live Stock Qty:</strong> ${liveStock}
+                ${mismatch ? `
+                    <br><span style="color:#975a16;">
+                        ${openOrderQty > 0
+                            ? `${balQty} (ledger) − ${openOrderQty} (open orders, already deducted but not yet Delivered) = ${expectedFromOpenOrders}${stillUnexplained ? `, which still doesn't match live stock of ${liveStock} — the remaining ${Math.abs(expectedFromOpenOrders - liveStock)} unit(s) may reflect a manual stock edit outside the normal Purchases flow.` : ', which matches live stock — fully explained by orders in progress.'}`
+                            : `There are no open (in-progress) orders for this product, so this gap likely reflects a manual stock edit outside the normal Purchases flow.`
+                        }
+                    </span>
+                ` : `<br><span>Ledger and live stock agree.</span>`}
             </div>
+            <div id="ledger-open-orders-detail" style="display:none; margin-top:10px;"></div>
         `;
     } catch (err) {
         console.error("Error loading product ledger:", err);
