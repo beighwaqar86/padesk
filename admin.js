@@ -379,6 +379,13 @@ function loadDataForTab(tabName) {
             loadLedgerProductList();
         }
     }
+    if (tabName === 'movement') {
+        if (movementCurrentRange) {
+            loadStockMovementReport(movementCurrentRange.from, movementCurrentRange.to, movementCurrentRange.label);
+        } else {
+            setMovementPreset('this_month');
+        }
+    }
 }
 
 // Refreshes the tab currently on screen in place — no navigation, no losing
@@ -1061,6 +1068,196 @@ async function loadProductLedger(productId, productName, productCode) {
     } catch (err) {
         console.error("Error loading product ledger:", err);
         tbody.innerHTML = `<tr><td colspan="11" style="padding:15px; text-align:center; color:red;">Failed to load ledger data.</td></tr>`;
+    }
+}
+
+// Jumps from the movement report straight into that product's full ledger
+function jumpToProductLedger(productId) {
+    const info = movementProductInfoCache[productId] || {};
+    ledgerCurrentProduct = { id: productId, name: info.name || 'Unknown Product', code: info.product_code || '' };
+    switchAdminTab('ledger');
+}
+
+// --- PERIOD STOCK MOVEMENT REPORT ---
+let movementProductInfoCache = {};
+let movementCurrentRange = null; // { from, to, label } — lets refreshCurrentTab() restore the view
+
+function formatDateInput(d) {
+    return d.toISOString().split('T')[0];
+}
+
+function setMovementPreset(preset) {
+    const now = new Date();
+    let from, to, label;
+
+    if (preset === 'this_month') {
+        from = new Date(now.getFullYear(), now.getMonth(), 1);
+        to = now;
+        label = 'This Month';
+    } else if (preset === 'last_month') {
+        from = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        to = new Date(now.getFullYear(), now.getMonth(), 0); // last day of previous month
+        label = 'Last Month';
+    } else if (preset === 'this_year') {
+        from = new Date(now.getFullYear(), 0, 1);
+        to = now;
+        label = 'This Year';
+    } else { // all_time
+        from = new Date(2000, 0, 1);
+        to = now;
+        label = 'All Time';
+    }
+
+    document.getElementById("movement-from-date").value = formatDateInput(from);
+    document.getElementById("movement-to-date").value = formatDateInput(to);
+    loadStockMovementReport(from, to, label);
+}
+
+function applyMovementCustomRange() {
+    const fromVal = document.getElementById("movement-from-date").value;
+    const toVal = document.getElementById("movement-to-date").value;
+    if (!fromVal || !toVal) {
+        alert("Please choose both a From and To date.");
+        return;
+    }
+    loadStockMovementReport(new Date(fromVal), new Date(toVal), 'Custom Range');
+}
+
+async function loadStockMovementReport(from, to, label) {
+    const tbody = document.getElementById("movement-report-table");
+    const tfoot = document.getElementById("movement-report-totals");
+    const labelEl = document.getElementById("movement-period-label");
+    if (!tbody) return;
+
+    // Normalize to full-day boundaries so the range is inclusive of both ends
+    const periodStart = new Date(from.getFullYear(), from.getMonth(), from.getDate(), 0, 0, 0);
+    const periodEnd = new Date(to.getFullYear(), to.getMonth(), to.getDate(), 23, 59, 59);
+
+    movementCurrentRange = { from: periodStart, to: periodEnd, label };
+    if (labelEl) labelEl.innerText = `Showing: ${label} (${periodStart.toLocaleDateString()} – ${periodEnd.toLocaleDateString()})`;
+    tbody.innerHTML = `<tr><td colspan="10" style="padding:15px; text-align:center; color:#718096;">Loading...</td></tr>`;
+    tfoot.innerHTML = '';
+
+    try {
+        const [{ data: allPurchases, error: purchErr }, { data: allDeliveredOrders, error: ordErr }, { data: allProducts, error: prodErr }] = await Promise.all([
+            db.from('purchases').select('*'),
+            db.from('orders').select('*').eq('fulfillment_status', 'Delivered'),
+            db.from('products').select('id, name, product_code')
+        ]);
+        if (purchErr) throw purchErr;
+        if (ordErr) throw ordErr;
+        if (prodErr) throw prodErr;
+
+        const productInfoById = {};
+        (allProducts || []).forEach(p => { productInfoById[p.id] = p; });
+        movementProductInfoCache = productInfoById;
+
+        // Per-product buckets: value/qty that happened BEFORE the period (for
+        // Opening balance) and value/qty that happened WITHIN the period.
+        const movement = {}; // productId -> { openQty, openValue, purQty, purValue, saleQty, saleValue }
+        const ensure = (id) => {
+            if (!movement[id]) movement[id] = { openQty: 0, openValue: 0, purQty: 0, purValue: 0, saleQty: 0, saleValue: 0 };
+            return movement[id];
+        };
+
+        (allPurchases || []).forEach(p => {
+            const pid = p.product_id;
+            if (!pid) return;
+            const qty = p.qty_received || 0;
+            const value = qty * parseFloat(p.purchase_unit_cost || 0);
+            const date = new Date(p.purchase_date || p.invoice_date);
+            const bucket = ensure(pid);
+
+            if (date < periodStart) {
+                bucket.openQty += qty;
+                bucket.openValue += value;
+            } else if (date <= periodEnd) {
+                bucket.purQty += qty;
+                bucket.purValue += value;
+            }
+        });
+
+        (allDeliveredOrders || []).forEach(o => {
+            const date = new Date(o.created_at);
+            const items = o.order_items_json || [];
+            items.forEach(item => {
+                const pid = item.product && item.product.id;
+                if (!pid) return;
+                const qty = item.qty || 0;
+                const invoicePrice = parseFloat(item.product.deal_price || item.product.price || 0);
+                const value = qty * invoicePrice;
+                const bucket = ensure(pid);
+
+                if (date < periodStart) {
+                    bucket.openQty -= qty;
+                    bucket.openValue -= value;
+                } else if (date <= periodEnd) {
+                    bucket.saleQty += qty;
+                    bucket.saleValue += value;
+                }
+            });
+        });
+
+        // Only products with actual purchase or sale activity within the period
+        const activeRows = Object.keys(movement)
+            .map(pid => ({ pid: parseInt(pid, 10), ...movement[pid] }))
+            .filter(r => r.purQty !== 0 || r.saleQty !== 0);
+
+        if (activeRows.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="10" style="padding:15px; text-align:center; color:#718096;">No purchase or delivered-sale activity in this period.</td></tr>`;
+            return;
+        }
+
+        activeRows.sort((a, b) => {
+            const nameA = (productInfoById[a.pid] && productInfoById[a.pid].name) || '';
+            const nameB = (productInfoById[b.pid] && productInfoById[b.pid].name) || '';
+            return nameA.localeCompare(nameB);
+        });
+
+        let totals = { openQty: 0, openValue: 0, purQty: 0, purValue: 0, saleQty: 0, saleValue: 0, closeQty: 0, closeValue: 0 };
+
+        tbody.innerHTML = activeRows.map(r => {
+            const info = productInfoById[r.pid] || {};
+            const closeQty = r.openQty + r.purQty - r.saleQty;
+            const closeValue = r.openValue + r.purValue - r.saleValue;
+
+            totals.openQty += r.openQty; totals.openValue += r.openValue;
+            totals.purQty += r.purQty; totals.purValue += r.purValue;
+            totals.saleQty += r.saleQty; totals.saleValue += r.saleValue;
+            totals.closeQty += closeQty; totals.closeValue += closeValue;
+
+            return `
+                <tr style="border-bottom:1px solid #edf2f7;">
+                    <td style="padding:7px 6px; font-weight:600; cursor:pointer; color:#3182ce;" onclick="jumpToProductLedger(${r.pid})">${info.name || 'Unknown Product'}</td>
+                    <td style="padding:7px 6px; color:#718096;">${info.product_code || '-'}</td>
+                    <td style="padding:7px 6px; text-align:right;">${r.openQty}</td>
+                    <td style="padding:7px 6px; text-align:right;">K ${r.openValue.toFixed(2)}</td>
+                    <td style="padding:7px 6px; text-align:right; color:#0baf65;">${r.purQty || ''}</td>
+                    <td style="padding:7px 6px; text-align:right; color:#0baf65;">${r.purValue ? 'K ' + r.purValue.toFixed(2) : ''}</td>
+                    <td style="padding:7px 6px; text-align:right; color:#3182ce;">${r.saleQty || ''}</td>
+                    <td style="padding:7px 6px; text-align:right; color:#3182ce;">${r.saleValue ? 'K ' + r.saleValue.toFixed(2) : ''}</td>
+                    <td style="padding:7px 6px; text-align:right; font-weight:bold;">${closeQty}</td>
+                    <td style="padding:7px 6px; text-align:right; font-weight:bold;">K ${closeValue.toFixed(2)}</td>
+                </tr>
+            `;
+        }).join('');
+
+        tfoot.innerHTML = `
+            <tr style="background:#f8fafc; font-weight:bold; border-top:2px solid #cbd5e0;">
+                <td colspan="2" style="padding:10px 6px;">Totals (${activeRows.length} product${activeRows.length === 1 ? '' : 's'})</td>
+                <td style="padding:10px 6px; text-align:right;">${totals.openQty}</td>
+                <td style="padding:10px 6px; text-align:right;">K ${totals.openValue.toFixed(2)}</td>
+                <td style="padding:10px 6px; text-align:right; color:#0baf65;">${totals.purQty}</td>
+                <td style="padding:10px 6px; text-align:right; color:#0baf65;">K ${totals.purValue.toFixed(2)}</td>
+                <td style="padding:10px 6px; text-align:right; color:#3182ce;">${totals.saleQty}</td>
+                <td style="padding:10px 6px; text-align:right; color:#3182ce;">K ${totals.saleValue.toFixed(2)}</td>
+                <td style="padding:10px 6px; text-align:right;">${totals.closeQty}</td>
+                <td style="padding:10px 6px; text-align:right; color:#0baf65;">K ${totals.closeValue.toFixed(2)}</td>
+            </tr>
+        `;
+    } catch (err) {
+        console.error("Error loading stock movement report:", err);
+        tbody.innerHTML = `<tr><td colspan="10" style="padding:15px; text-align:center; color:red;">Failed to load report.</td></tr>`;
     }
 }
 
